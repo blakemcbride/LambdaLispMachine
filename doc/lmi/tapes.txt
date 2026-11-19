@@ -1,0 +1,7 @@
+00_install.tap - Bits of the Unix tapes you already have combined with some bits from the tapes jrm
+                 just gave you to make a “tools” tape for installing a Lambda. It differs from a real
+                 tools tape in that there is a double EOF after the band images. The SDU expects some
+                 kind of indication of end-of-file that I don’t know about yet, so this makes it proceed
+                 in the right order anyway (albeit with complaints) 
+
+02_system.tap  - A lisp backup tape of DJ’s Lambda source tree, suitable for restoring after installing the above.
