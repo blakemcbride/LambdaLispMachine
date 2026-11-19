@@ -62,7 +62,7 @@ video:
   # Use (TV:SET-CONSOLE-SIZE width height) to change the LispM view.
   height: 800
 
-# Audio settings, only available when using SDL2 (where BEEP is implemented)
+# Audio settings (for BEEP)
 audio: 
   # Volume factor, from 0.0 to 1.0. I like 0.3.
   volume: 1.0

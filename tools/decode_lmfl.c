@@ -25,6 +25,7 @@
 */
 
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>

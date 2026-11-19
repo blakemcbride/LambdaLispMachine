@@ -36,7 +36,7 @@ void framebuffer_update_hword(int vn,uint32_t addr,uint16_t data);
 void framebuffer_update_byte(int vn,uint32_t addr,uint8_t data);
 void set_bow_mode(int vn,int mode);
 
-#ifdef SDL2
+#ifdef XBEEP
 // xbeep
 void xbeep(int halfwavelength, int duration);
 #else

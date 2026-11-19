@@ -1,9 +1,14 @@
-# NOTICE OF MAINTENANCE/DEVELOPMENT HIATUS
+# NOTICE
 
-Real-life conditions have made it extremely unlikely I will be in any position
-to work on (let alone maintain) this project for an extended period of time.
+This is a maintained fork of Daniel Seagraves' LambdaDelta
+(https://github.com/dseagrav/ld), which its author placed on indefinite
+hiatus in December 2020. The fork builds with current compilers and uses
+SDL3.
 
-You are encouraged to fork and/or develop a replacement this software.
+This repository is self-contained: besides the emulator source it holds the
+ROM images, tape images, an already-installed disk image, the surviving LMI
+software archives and the LMI documentation. See
+[Quick Start](#quick-start) and [What Is In This Repository](#what-is-in-this-repository).
 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
@@ -11,11 +16,14 @@ You are encouraged to fork and/or develop a replacement this software.
 - [LAMBDADELTA](#lambdadelta)
     - [About the Lambda](#about-the-lambda)
     - [Contact](#contact)
+- [Quick Start](#quick-start)
+- [What Is In This Repository](#what-is-in-this-repository)
 - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Building LambdaDelta](#building-lambdadelta)
 - [Configuring LambdaDelta](#configuring-lambdadelta)
 - [Using LambdaDelta](#using-lambdadelta)
+    - [Exiting](#exiting)
     - [Preparing ROM Images](#preparing-rom-images)
     - [Microcode Symbol Files](#microcode-symbol-files)
     - [Installing a New Machine](#installing-a-new-machine)
@@ -33,7 +41,7 @@ Unix-like operating system, but is developed primarily on Linux. The initial
 versions will most likely fail to compile elsewhere, but attempts will be
 made to rectify this as soon as practical.
 
-SDL Version 1 or 2 is used for console IO, the Linux tuntap driver or
+SDL Version 3 is used for console IO, the Linux tuntap driver or
 Berkeley Packet Filter is used for network IO, and standard Unix file
 operations are used for disk and tape IO. LambdaDelta includes code from the
 Fake86 project by Mike Chambers in its SDU implementation.
@@ -77,14 +85,71 @@ See http://lists.tunes.org/mailman/listinfo/lispm/ for more information.
 
 All contributors to this project are listed in the AUTHORS file.
 
+# Quick Start
+
+This brings up a Lisp Listener using the included, already-installed disk
+image (Lambda Release 5.0, System 130.0, microcode 1762).
+
+    autoreconf -i
+    ./configure
+    make
+    mkdir -p disks
+    xz -dc installed/disk.img.xz > disks/disk.img
+    cp installed/CMOS.RAM installed/RTC.RAM installed/ulambda.lmc-sym .
+    cp examples/ld.conf ld.conf
+    src/lam
+
+If LambdaDelta was built with libyaml it reads `lam.yml` instead of
+`ld.conf`; in that case create a `lam.yml` containing
+
+    sdu:
+      switch: 1
+
+A window opens showing the SDU monitor prompt (`>>`). Type `newboot` and
+press enter, and at the `Command:` prompt type `boot`. Lisp takes well under
+a minute to start. From there, continue at step 21 of
+[Installing a New Machine](#installing-a-new-machine) to name the machine,
+create its file system and restore the system sources from
+`tapes/02_system.tap`.
+
+Ethernet needs a tuntap interface and the privilege to open it. Without
+that LambdaDelta prints `ether_init(): Operation not permitted` and runs
+without a network.
+
+# What Is In This Repository
+
+| Path        | Contents |
+|-------------|----------|
+| `src`       | The emulator (`lam`) and the partition tool `lpart`. |
+| `tools`     | Tape and disk image utilities, and `lmfuse`, a FUSE view of an LMFS file system. |
+| `roms`      | The three ROM images the emulator loads, under the names it expects. |
+| `firmware`  | The original Bitsavers firmware archives the ROM images came from, along with the PAL and PROM dumps for the other boards. |
+| `tapes`     | Tape images. `00_install.tap` is the installation tape and `02_system.tap` is a Lisp backup tape of the system sources. The others are LMI Unix boot and distribution tapes and two unidentified tapes. |
+| `installed` | A disk image (compressed) and matching CMOS/RTC contents produced by running the installation procedure below through step 17, and the symbol file for its microcode (version 1762), which the emulator needs in order to make Lisp's beep audible. |
+| `software`  | Archives of Lambda file systems (`dj_full.tgz`, `jb_full.tgz`) and the K-Machine software (`k_machine.tgz`). These hold the Lisp system sources as ordinary files. |
+| `doc`       | `KEYCODES` and `OLDCONF.md` for the emulator, and in `doc/lmi` the LMI manuals (Lisp, editors, hardware, Unix, release notes), the field service manual, SDU description, K-Machine material and board photographs. `doc/lmi/tapes.txt` describes the two main tapes. |
+| `examples`  | Sample configuration files. |
+
+The ROM, tape, software and documentation files came from Bitsavers
+(http://www.bitsavers.org/), directories `pdf/lmi` and `bits/LMI`.
+
 # Getting Started
 
 ## Prerequisites 
 
+To build LambdaDelta you need a C compiler, the GNU autotools, pkg-config
+and the development files for SDL3 (3.2 or later). The libyaml development
+files are optional but recommended (they enable the YAML configuration file),
+and the FUSE 2 development files are needed only for the `lmfuse` tool.
+On Fedora: `dnf install gcc make autoconf automake pkgconf SDL3-devel libyaml-devel`.
+
 LambdaDelta requires a set of ROM images from a physical Lambda, and
 either a disk image of an installed system or images of the installation
-and source tapes. At the time of release, these items are available from
-Bitsavers. See http://www.bitsavers.org/ for more information.
+and source tapes. All of these are included in this repository: the ROM
+images are in the `roms` directory under the names the emulator expects,
+an installed disk image is in `installed`, and the installation tape
+(`00_install.tap`) and system source tape (`02_system.tap`) are in the
+`tapes` directory. The LMI manuals are in `doc/lmi`.
 
 Bogodyne ZetaLisp System 500.0 Release 1 can be found at https://www.bogodyne.com/download/download-zetalisp/
 
@@ -94,17 +159,17 @@ LambdaDelta uses the GNU auto* tools for configuration and compilation.
 Most features and libraries should be configured automatically when
 the `configure` script is run.
 
-To generate the configure script from a git checkout, the usual recipe is
-`aclocal ; autoheader ; autoconf ; automake --add-missing`. Your platform
-may require different invocation(s) of these programs.
+To build from a git checkout:
 
-If the generated configure script fails, try `autoreconf -i` and re-run it.
-(See dseagrav/ld#6 for the issue.)
+    autoreconf -i
+    ./configure
+    make
 
-If your system has both SDL1 and SDL2, you will be required to explicitly disable
-the one you do not want. (use --`without-SDLx`). SDL1 seems to perform
-better over remote X11 connections, but SDL2 has better performance
-when running locally.
+The emulator is `src/lam`. It looks for the `roms`, `tapes` and `disks`
+directories in its working directory, so run it from the top of the tree
+(`src/lam`) unless you have configured a different working directory.
+
+The console window may be resized; the Lambda screen is scaled to fit.
 
 If you wish to emulate the optional 2x2 configuration, run configure
 with the option `--enable-config-2x2=yes`
@@ -193,11 +258,14 @@ F11 simulates the "return to newboot" keyboard chord, which terminates Lisp
   sequence of bytes to make things happen.
 
 F12 causes the active tape image file to rotate to the next file in
-  ASCIIbetical order. Pressing control and F12 at the same time causes
-  the emulator to dump its state into a bunch of .DUMP files. These files
+  ASCIIbetical order. Pressing shift and F12 at the same time causes
+  the emulator to dump its state into a bunch of .DUMP files and write
+  screenshots. These files
   are human-readable but not necessarily human-understandable. (It is our
   understanding that whether or not the developers are classified as human
-  is a subject of ongoing debate.)
+  is a subject of ongoing debate.) Sending the emulator a `SIGUSR1` signal
+  writes just the screenshots, as `VC0-SCREENSHOT.BMP` and
+  `VC1-SCREENSHOT.BMP`.
 
 All other keys on the keyboard may be remapped using the map_key option
 described above. The standard mapping preserves the printed key label
@@ -232,36 +300,73 @@ of the standard typewriter keys. The other keys are mapped as follows:
 The default keymap is still under development and is subject to change. Feel
 free to make suggestions or comments.
 
+## Exiting
+
+To exit LambdaDelta, close its window. This saves the SDU's CMOS and
+clock contents to `CMOS.RAM` and `RTC.RAM` and ends the program. Sending
+the emulator a `SIGTERM` signal does the same thing. If closing the window
+does nothing, the `sdl_quit` configuration option (`quit` in the keyboard
+section of the YAML configuration) has been turned off.
+
+Typing control-C in the terminal LambdaDelta was started from kills it
+at once without saving `CMOS.RAM` and `RTC.RAM`. That loses any changes
+made to the SDU configuration during the session.
+
+The disk image is written as the Lambda writes to its disk, so nothing
+needs to be flushed on the way out. Exiting is the same as switching off a
+real Lambda, though: anything in the running Lisp world that has not been
+saved to a file is lost. Save your editor buffers first.
+
+To stop Lisp without leaving the emulator, evaluate `(si:%halt)`, or
+press F11 to return to Newboot, where the `boot` command starts Lisp again.
+
 ## Preparing ROM Images
 
-The ROM images go in the "roms" subdirectory. The necessary files are:
+The ROM images go in the "roms" subdirectory, and are already there in this
+repository. The necessary files are:
 
 - `SDU.ROM`: 
 The SDU's 8088 program ROM. 64K, merged from two chips on the board. 
-Bitsavers has one with an MD5 checksum of  `4795bf46168808d32012213c0b370f30`
+It is `combined.BIN` from `firmware/SDU_15165-0003.ZIP`, with an MD5
+checksum of `4795bf46168808d32012213c0b370f30`.
 - `MEM.ROM`:
 The nubus-space configuration ROM for a memory card. 2K.
-Bitsavers has two, and their MD5 checksums are `21089f3b4082548865f8cda6017f302e` or `1f898d018a2e2ab29279ecf00c7a4c82`.
+There are two in `firmware/Memory`: `2243902_OF_27S291.BIN`
+(MD5 `21089f3b4082548865f8cda6017f302e`, the one installed as `MEM.ROM`)
+and `OF_27S291.BIN` (MD5 `1f898d018a2e2ab29279ecf00c7a4c82`).
 Either one may be used, but the same one will be used for both cards simulated.
 - `VCMEM.ROM` - The VCMEM's nubus-space configuration ROM. 2K. 
 This contains 8088 program code that will be run by the SDU. 
-The one on Bitsavers has an MD5 checksum of `0e53416a49294f02c7fd925c9de47f5a`.
-
-These can be found in zip files on the PDFs side of Bitsavers.
+It is `U43_2516_2242843-0001_0856TI200038.BIN` from `firmware/VC_MEM.ZIP`,
+with an MD5 checksum of `0e53416a49294f02c7fd925c9de47f5a`.
 
 ## Microcode Symbol Files
 
-In the lisp source tree there are files named `bootstrap.lam-uload` and 
-`ulambda.lmc-sym` which correspond to the Lambda bootstrap code downloaded
-by the SDU and the Lisp microcode. Place these in the LambdaDelta directory
-to provide symbols for debugging. These are optional.
+In the lisp source tree (included here in `software/dj_full.tgz`, under
+`dj_full/l/ubin`) there are files named `bootstrap.lam-uload` and 
+`ulambda.lmc-sym`, each with a version number suffix, which correspond to
+the Lambda bootstrap code downloaded by the SDU and the Lisp microcode.
+Place these, without the suffix, in the LambdaDelta directory
+to provide symbols for debugging. These are optional, but without
+`ulambda.lmc-sym` the emulator cannot find the microcode's beep routine,
+so it prints `can't find XBEEP ucode address` and Lisp's beep is silent.
+The symbol file must match the microcode version in use. The one for the
+included disk image is `installed/ulambda.lmc-sym`; others are in
+`software/dj_full.tgz` under `dj_full/l/ubin`.
 
 ## Installing a New Machine
 
-1. Prepare your config file, ROM images, tape images, and create the disk
-   image file. Ensure the SDU switch setting is zero in your configuration.
+The included `installed/disk.img.xz` is the result of steps 1 through 17,
+so this procedure is needed only to build a machine from scratch. The ROM
+and tape images it uses are already in `roms` and `tapes`.
+
+1. Prepare your config file and create the disk image file, which must be
+   the size of the disk being emulated. For the Eagle used below:
+   `mkdir -p disks ; truncate -s 431104000 disks/disk.img`.
+   Ensure the SDU switch setting is zero in your configuration.
 2. Start the emulator. Telnet to port 3637 on the host. The emulator should
-   start, and you should have a SDU prompt in your telnet session.
+   start, and you should have a SDU prompt in your telnet session. You may
+   disconnect and reconnect at any time.
 
    Ignore the graphical console for the now - It is inoperative until
    the SDU firmware partition is loaded and the CMOS contents are valid.
@@ -269,15 +374,23 @@ to provide symbols for debugging. These are optional.
 3. Type `init` and push enter to initialize the busses and SDU. The SDU will
    reboot.
 
-4. Ensure the install tape is the active tape.
+4. Ensure the install tape is the active tape. (`tapes/00_install.tap`
+   sorts first, so it is the active tape at startup.)
 
 5. Give the SDU command `/tar/setup clear eagle sp shell`. Your CMOS should
    be initialized.
 
-6. Give the SDU command `/tar/load` and follow the prompts.
+6. Give the SDU command `/tar/load` and follow the prompts. (Answer `y`
+   to creating a new label and `1` for the number of Lambda processors.)
 
 7. When the `load >` prompt appears, give the command `install` and follow
-   the prompts.
+   the prompts. With the included `00_install.tap` this loads only the SDU
+   software and then reports `End of tape`, because that tape has a double
+   file mark after each band. Give the command `read-tape` three more times,
+   pressing enter each time to accept the suggested partition, to load the
+   microcode into LMC1 and LMC2 and the Lisp band into LOD1. The `print`
+   command shows the label so you can check the result. Do not run `install`
+   a second time; it rewinds the tape.
 
 8. Give the command `q` to return to the SDU
 
@@ -320,10 +433,13 @@ to provide symbols for debugging. These are optional.
 25. When the REPL arrives, evaluate `(fs:initialize-file-system)` to 
     format the LMFS. Answer `Yes` when prompted for confirmation.
 
-26. Push F12 to switch tapes to your distribution tape, if you have one.
+26. Push F12 to switch tapes to your distribution tape. The window title
+    shows the active tape; the included system source tape is
+    `02_system.tap`.
 
 27. Type System-B to summon the Backup activity.
 
 At this point you can follow the instructions included with the
 distribution tape. If it is a backup tape, simply restore it. If it is
 an actual distribution tape, it may have special loading procedures.
+The included `02_system.tap` is a backup tape.

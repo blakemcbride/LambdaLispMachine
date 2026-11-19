@@ -20,19 +20,16 @@ foo*
 # Partition images
 ULM*
 LOD*
-*sym
-bootstrap*
+/*sym
+/bootstrap*
 # The disk image file
 disk.img
 # CMOS image file
-CMOS.RAM
+/CMOS.RAM
 # RTC RAM image file
-RTC.RAM
-# ROM image files
-roms/*
-# Disk and tape image files
+/RTC.RAM
+# Disk image files (ROM and tape images are kept in the repo)
 disks/*
-tapes/*
 # The configuration file
 ld.conf
 # Autoconf stuff
@@ -54,5 +51,9 @@ src/Makefile
 src/config.h.in
 src/config.h
 src/stamp*
+config.guess
+config.sub
+configure~
+lam.out
 tools/.deps/
 tools/lmfuse/.deps/

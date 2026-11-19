@@ -15,10 +15,6 @@ AC_PROG_CC
 AC_ARG_ENABLE([use_xbeep],
 	[AS_HELP_STRING([--enable-use-xbeep], [Enable superior XBEEP hack @<:@default=yes@:>@])])
 
-AS_IF([test "x$enable_use_xbeep" = "xno"], [], [
-	CFLAGS="$CFLAGS -DXBEEP"
-	])
-
 # Conditionalize UTUN
 AC_ARG_ENABLE([use_utun],
 	[AS_HELP_STRING([--enable-use-utun], [Use UTUN frame diverter with BPF @<:@default=no@:>@])])
@@ -52,55 +48,22 @@ AS_IF([test "x$enable_config_physms" = "xyes"], [
 	])
 
 # Checks for libraries.
-AC_ARG_WITH([SDL1],
-	[AS_HELP_STRING([--with-SDL1],
-		[Use SDL1 for console @<:@default=check@:>@])],
-	[],
-	[with_SDL1=check])
-
-AC_ARG_WITH([SDL2],
-	[AS_HELP_STRING([--with-SDL2],
-		[Use SDL2 for console @<:@default=check@:>@])],
-	[],
-	[with_SDL2=check])
-
 AC_ARG_WITH([FUSE],
 	[AS_HELP_STRING([--with-FUSE],
 		[support FUSE-based LMFS filesystem @<:@default=check@:>@])],
 	[],
 	[with_FUSE=check])
 
-# Checks for SDL1
-SDL_VERSION=1.2.0
-LIBSDL1=
-AS_IF([test "x$with_SDL1" != xno],
-		    [AM_PATH_SDL($SDL_VERSION,:,
-			AS_IF([test "x$with_SDL1" == xyes],[AC_MSG_ERROR([*** SDL1 version $SDL_VERSION not found!])])
-  			)
-			GFX_SDL1=TRUE
-			CFLAGS="$CFLAGS $SDL_CFLAGS -DSDL1"
-			LIBS="$LIBS $SDL_LIBS"
-			])
+# SDL3 is used for the console
+PKG_CHECK_MODULES([SDL3], [sdl3 >= 3.2.0], [],
+	[AC_MSG_ERROR([*** SDL3 (version 3.2.0 or later) development files not found!])])
+CFLAGS="$CFLAGS $SDL3_CFLAGS"
+LIBS="$LIBS $SDL3_LIBS"
 
-# Checks for SDL2
-SDL2_VERSION=2.0.0
-LIBSDL2=
-AS_IF([test "x$with_SDL2" != xno],
-		    [AM_PATH_SDL2($SDL2_VERSION,:,
-			AS_IF([test "x$with_SDL2" == xyes],[AC_MSG_ERROR([*** SDL2 version $SDL_VERSION not found!])])
-			)
-			GFX_SDL2=TRUE
-			CFLAGS="$CFLAGS $SDL_CFLAGS -DSDL2"
-			LIBS="$LIBS $SDL_LIBS"
-			])
-
-# Blow up if we ended up with both SDLs or neither SDL
-AS_IF([test "$GFX_SDL1" = TRUE],
-	    [AS_IF([test "$GFX_SDL2" = TRUE],
-	    		 [AC_MSG_ERROR([*** You may use SDL1 or SDL2 but not both!])])],
-	    [AS_IF([test "$GFX_SDL2" = TRUE],
-	    		 [],
-			 [AC_MSG_ERROR([*** You must have either SDL1 or SDL2!])])])
+# XBEEP
+AS_IF([test "x$enable_use_xbeep" != "xno"], [
+	CFLAGS="$CFLAGS -DXBEEP"
+	])
 
 # Check for FUSE
 LIBFUSE=
@@ -112,7 +75,6 @@ AS_IF([test "x$with_FUSE" != xno],
 	 	     fi])])
 
 # Checks for header files.
-AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h netdb.h netinet/in.h arpa/inet.h stddef.h stdint.h stdlib.h string.h strings.h])
 AC_CHECK_HEADERS([ sys/ioctl.h sys/socket.h sys/time.h unistd.h termios.h utime.h])
 AC_CHECK_HEADERS([linux/if.h], [], [],

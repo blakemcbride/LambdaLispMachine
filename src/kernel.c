@@ -49,15 +49,9 @@
 #endif
 
 // SDL
-#ifdef SDL1
-#include <SDL.h>
-#include <SDL_keysym.h>
-#endif
 
-#ifdef SDL2
-#include <SDL.h>
-#include <SDL_keycode.h>
-#endif
+#include <math.h>
+#include <SDL3/SDL.h>
 
 // LambdaDelta things
 #include "ld.h"
@@ -318,25 +312,15 @@ void xbeep_audio_init();
 void xbeep_audio_close();
 #endif
 
-#ifdef SDL1
-// SDL1 state
-SDL_Surface *screen;
-SDL_TimerID SDLTimer;
-int video_width = VIDEO_WIDTH;
-int video_height = DEFAULT_VIDEO_HEIGHT;
-#endif
 
-#ifdef SDL2
-// SDL2 state
+// SDL3 state
 SDL_Window *SDLWindow;
 SDL_Renderer *SDLRenderer;
 SDL_Texture *SDLTexture;
-SDL_TimerID SDLTimer;
 uint32_t FrameBuffer[MAX_VIDEO_HEIGHT*VIDEO_WIDTH];
 // current size
 int video_width = VIDEO_WIDTH;
 int video_height = DEFAULT_VIDEO_HEIGHT;
-#endif
 
 // Stringify macros
 #define STR_EXPAND(tok) #tok
@@ -395,131 +379,7 @@ uint32_t kb_buckybits;
 #define KB_BB_ALTLOCK 0x08000
 #define KB_BB_MODELOCK 0x10000
 
-#ifdef SDL1
-void init_sdl_to_keysym_map(void){
-  int x = 0;
-  while(x < 512){
-    map[x] = 0;
-    modmap[x] = 0;
-    x++;
-  }
-  // Default key map
-  map['1'] = 0121; // 1
-  map['2'] = 0061; // 2
-  map['3'] = 0161; // 3
-  map['4'] = 0011; // 4
-  map['5'] = 0111; // 5
-  map['6'] = 0051; // 6
-  map['7'] = 0151; // 7
-  map['8'] = 0031; // 8
-  map['9'] = 0071; // 9
-  map['0'] = 0171; // 0
-  map['-'] = 0131; // -
-  //  map['+'] = 0x2f; // + is shifted =
-  map['='] = 0126;              /* not keypad-equal, real equals */
 
-  map['Q'] = 0122; // Q
-  map['W'] = 0062; // W
-  map['E'] = 0162; // E
-  map['R'] = 0012; // R
-  map['T'] = 0112; // T
-  map['Y'] = 0052; // Y
-  map['U'] = 0152; // U
-  map['I'] = 0032; // I
-  map['O'] = 0072; // O
-  map['P'] = 0172; // P
-
-  map['A'] = 0123; // A
-  map['S'] = 0063; // S
-  map['D'] = 0163; // D
-  map['F'] = 0013; // F
-  map['G'] = 0113; // G
-  map['H'] = 0053; // H
-  map['J'] = 0153; // J
-  map['K'] = 0033; // K
-  map['L'] = 0073; // L
-
-  map['Z'] = 0124; // Z
-  map['X'] = 0064; // X
-  map['C'] = 0164; // C
-  map['V'] = 0014; // V
-  map['B'] = 0114; // B
-  map['N'] = 0054; // N
-  map['M'] = 0154; // M
-
-  map['['] = 0132; // Unshifted (, [ is shiftstate
-  map[']'] = 0137; // Unshifted ), ] is shiftstate
-  map[';'] = 0173;
-  map['`'] = 0077;
-  // map['~'] = 061;               /* special treatment (this is too useful to remap) */
-  map['\\'] = 0037;
-  map[' '] = 0134;
-
-  map[','] = 0034;
-  map['.'] = 0074;
-  map['/'] = 0174;
-  map[';'] = 0173;
-  map['\''] = 0133;
-
-  map[SDLK_RETURN] = 0136; // ENTER
-  map[SDLK_BACKSPACE] = 0023; // BACKSPACE (MAPS TO RUBOUT)
-  map[SDLK_TAB] = 0022; // TAB
-  map[SDLK_ESCAPE] = 0143; // ALT MODE
-
-  // LMI arrows were shift states?
-  // Or maybe it's the HAND keys?
-  map[SDLK_UP] = 0106; // hand up
-  map[SDLK_DOWN] = 0176; // hand down
-  map[SDLK_RIGHT] = 0017; // hand right
-  map[SDLK_LEFT] = 0117; // hand left
-
-  // No home or insert, no F1 or F2
-  map[SDLK_HOME] = 0x15; /* HOME - F1 */
-  map[SDLK_INSERT] = 0x14; /* INSERT - F2 */
-
-  // No page up or down
-  map[SDLK_PAGEUP] = 0067; /* PAGEUP - ABORT */
-  map[SDLK_PAGEDOWN] = 0047; /* PAGEDOWN - RESUME */
-
-  map[SDLK_END] = 0156; /* END - END */
-
-  map[SDLK_F1] = 0141; /* F1 - SYSTEM */
-  map[SDLK_F2] = 0042; /* F2 - NETWORK */
-  map[SDLK_F3] = 0046; /* F3 - STATUS */
-  map[SDLK_F4] = 0040; /* F4 - TERMINAL */
-  map[SDLK_F5] = 0116; /* F5 - HELP */
-  map[SDLK_F6] = 0110; /* F6 - CLEAR */
-  map[SDLK_F7] = 0167; /* F7 - BREAK */
-  // SDLK_F9 = CONSOLE SWITCH
-  // SDLK_F10 = MOUSE CAPTURE/RELEASE
-  // SDLK_F11 = RETURN TO NEWBOOT
-  // SDLK_F12 = DUMP STATE
-
-  map[SDLK_CAPSLOCK] = 0x03; // CAPSLOCK
-
-  map[SDLK_RSHIFT] = 0025; // RIGHT SHIFT
-  map[SDLK_LSHIFT] = 0024; // LEFT SHIFT
-
-  map[SDLK_RCTRL] = 0044; // RIGHT CTRL is 0026, but we want LEFT GREEK which is 0044
-  map[SDLK_LCTRL] = 0020; // LEFT CTRL
-  map[SDLK_RALT] = 0005; // Mapped to LEFT SUPER // 0165; // RIGHT ALT (META)
-  map[SDLK_LALT] = 0045; // LEFT ALT (META)
-
-  map[SDLK_RSUPER] = 0065; // RIGHT windows (SUPER)
-  map[SDLK_LSUPER] = 0005; // LEFT windows (SUPER)
-
-  // Default modifier map
-  modmap[SDLK_LSHIFT] = KB_BB_LSHIFT;
-  modmap[SDLK_RSHIFT] = KB_BB_RSHIFT;
-  modmap[SDLK_LCTRL] = KB_BB_LCTL;
-  modmap[SDLK_RCTRL] = KB_BB_GREEK;
-  modmap[SDLK_LALT] = KB_BB_LMETA;
-  modmap[SDLK_RALT] = KB_BB_LSUPER;
-  modmap[SDLK_MENU] = KB_BB_RHYPER;
-}
-#endif /* SDL1 keymap */
-
-#ifdef SDL2
 void init_sdl_to_scancode_map(void){
   map[0x12] = 1;
   map[SDL_SCANCODE_1] = 0121; // 1
@@ -634,7 +494,6 @@ void init_sdl_to_scancode_map(void){
   modmap[SDL_SCANCODE_RALT] = KB_BB_LSUPER;
   modmap[SDL_SCANCODE_APPLICATION] = KB_BB_RHYPER;
 }
-#endif /* SDL2 keymap */
 
 // Utility functions
 void FB_dump(int vn);
@@ -710,590 +569,15 @@ int put_mouse_rx_ring(int vn,unsigned char ch){
   return(0);
 }
 
-#ifdef SDL1
-void kbd_handle_char(int symcode, int down){
-  int sdlchar = symcode;
-  unsigned char outchar=0;
 
-  // Check for debug
-  if(sdlchar == SDLK_F12){
-    if(down){
-      if(((kb_buckybits&KB_BB_LSHIFT)|(kb_buckybits&KB_BB_RSHIFT)) != 0){
-	printf("DEBUG: DUMP REQUESTED FROM CONSOLE\n");
-	lambda_dump(DUMP_ALL);
-	FB_dump(0);
-	FB_dump(1);
-      }else{
-	tapemaster_open_next();
-      }
-    }
-    return;
-  }
-
-  // Check for return-to-newboot key
-  // This simulates pressing a boot chord because doing it on the PC is a chore.
-  // The real keyboard will send all bits as normal until the last key of a chord is pressed,
-  // at which point it sends one of these sequences instead of the final down key packet.
-  // After that, all key-up packets are sent as normal.
-  // For our purposes it is not necessary to generate the key down and key up messages, just the
-  // chord packet.
-  if(sdlchar == SDLK_F11){
-    // The chord we simulate is control-meta-control-meta-<LINE>
-    // This causes the SDU to halt the Lambda at the next "safe" place.
-    if(down){
-      put_rx_ring(active_console,0x60);
-      put_rx_ring(active_console,0x9F);
-    }
-    // The other boot chords are:
-    // control-meta-control-meta-<END>
-    // This causes the SDU to halt the Lambda immediately.
-    // It sends 0x43 0xBC
-    // control-meta-control-meta-<RUBOUT>
-    // This causes the SDU to trigger a cold boot of the Lambda.
-    // It sends 0x5D 0xA2
-    // control-meta-control-meta-<RETURN>
-    // This causes the SDU to trigger a warm boot of the Lambda.
-    // It sends 0x2E 0xD1
-    return;
-  }
-
-#ifndef CONFIG_PHYSMS
-  // Check for decapture/pointer-hide-show key
-  if(sdlchar == SDLK_F10){
-    if(down){
-      if(mouse_capture != 0){
-	mouse_capture = 0;
-	if(mouse_op_mode == 0){
-	  SDL_WM_GrabInput(SDL_GRAB_OFF);
-	}
-	SDL_ShowCursor(SDL_ENABLE);
-      }else{
-	mouse_capture = 1;
-	if(mouse_op_mode == 0){
-	  SDL_WM_GrabInput(SDL_GRAB_ON);
-	}
-	SDL_ShowCursor(SDL_DISABLE);
-      }
-    }
-    return;
-  }
-#endif
-
-  // Check for console switch key
-#ifdef CONFIG_2X2
-  if(sdlchar == SDLK_F9){
-    if(down){      
-      // Switch active console
-      active_console ^= 1;
-      printf("CONSW: %d\n",active_console);
-      // Update window title
-      stat_time = 20;
-      // Refresh display bitmap from stored image
-      uint32_t *p = screen->pixels;
-      uint32_t *s = FB_Image[active_console];
-      int i,j;
-      for (i = 0; i < video_width; i++) {
-	for (j = 0; j < video_height; j++)
-	  *p++ = *s++;
-      }
-      // Redraw it
-      SDL_UpdateRect(screen, 0, 0, video_width, video_height);
-      // Reset accumulation
-      u_minh = 0x7fffffff; u_maxh = 0; u_minv = 0x7fffffff; u_maxv = 0;
-#ifndef CONFIG_PHYSMS
-      // If we are in shared mouse mode, move the pointer to where the new console thinks it should be
-      if(mouse_op_mode == 1 && cp_state[active_console] == 3){
-	warp_mouse_callback(active_console);
-      }
-#endif
-    }
-    return;
-  }
-#endif
-
-  /* for now, fold lower case to upper case */
-  /* (because we're ignoring modifiers) */
-  if (sdlchar >= 'a' && sdlchar <= 'z'){
-    sdlchar -= ' ';
-  }
-  
-  // Obtain keymap entry
-  outchar = map[sdlchar];
-
-  // We send 2 characters. First is keycode, second is key state + bucky bits.
-  put_rx_ring(active_console,outchar); // Keycode
-  // Next is key up/down state and bucky bits
-  outchar = 0x80; // This is the "second byte" flag  
-  if(down){
-    // Key Down
-    outchar |= 0x40; // Key Down Flag
-    if(modmap[sdlchar] != 0){
-      kb_buckybits |= modmap[sdlchar];
-    }
-    // Take "down" bucky bits
-    if(((kb_buckybits&KB_BB_LSHIFT)|(kb_buckybits&KB_BB_RSHIFT)) != 0){ outchar |= 0x20; }
-    if(((kb_buckybits&KB_BB_LCTL)|(kb_buckybits&KB_BB_RCTL)) != 0){ outchar |= 0x10; }
-    if(((kb_buckybits&KB_BB_LMETA)|(kb_buckybits&KB_BB_RMETA)) != 0){ outchar |= 0x08; }
-    if(((kb_buckybits&KB_BB_LSUPER)|(kb_buckybits&KB_BB_RSUPER)) != 0){ outchar |= 0x04; }
-    if(((kb_buckybits&KB_BB_LHYPER)|(kb_buckybits&KB_BB_RHYPER)) != 0){ outchar |= 0x02; }
-    if((kb_buckybits&KB_BB_GREEK) != 0){ outchar |= 0x01; }
-  }else{
-    // Key Up
-    if(modmap[sdlchar] != 0){
-      kb_buckybits &= ~modmap[sdlchar];
-    }
-    // Take "up" bucky bits
-    if((kb_buckybits&KB_BB_MODELOCK) != 0){ outchar |= 0x10; }
-    if((kb_buckybits&KB_BB_ALTLOCK) != 0){ outchar |= 0x08; }
-    if((kb_buckybits&KB_BB_CAPSLOCK) != 0){ outchar |= 0x04; }
-    if((kb_buckybits&KB_BB_REPEAT) != 0){ outchar |= 0x02; }
-    if(((kb_buckybits&KB_BB_LTOP)|(kb_buckybits&KB_BB_RTOP)) != 0){ outchar |= 0x01; }
-  }
-  // Send result
-  put_rx_ring(active_console,outchar);
-
-  // printf("KB: Key event sent\n");
-  vcmem_kb_int(active_console);
+// Push the host framebuffer to the window
+static void sdl_present(void){
+  SDL_UpdateTexture(SDLTexture, NULL, FrameBuffer, (VIDEO_WIDTH*4));
+  SDL_RenderClear(SDLRenderer);
+  SDL_RenderTexture(SDLRenderer, SDLTexture, NULL, NULL);
+  SDL_RenderPresent(SDLRenderer);
 }
 
-void sdl_system_shutdown_request(void){
-  exit(0);
-}
-
-void sdl_process_key(SDL_KeyboardEvent *ev, int updown){
-  kbd_handle_char(ev->keysym.sym, updown);
-}
-
-#ifndef CONFIG_PHYSMS
-void sdl_send_mouse_event(void){
-  int state,xm,ym;
-  uint8_t buttons=0x07;
-  if(mouse_op_mode == 0){
-    // Direct Mode
-    state = SDL_GetRelativeMouseState(&xm, &ym);
-    // Disregard mouse when not captured, unless we are recapturing it.
-    if(mouse_capture == 0 && (state & SDL_BUTTON(SDL_BUTTON_LEFT))){
-      mouse_capture = 2;
-      return;
-    }
-    if(mouse_capture == 2 && !(state & SDL_BUTTON(SDL_BUTTON_LEFT))){
-      mouse_capture = 1;
-      SDL_WM_GrabInput(SDL_GRAB_ON);
-      SDL_ShowCursor(SDL_DISABLE);
-      return;
-    }
-    if(mouse_capture != 1){
-      return;
-    }
-    if(cp_state[active_console] != 3){ return; }
-    // Proceed
-    if (state & SDL_BUTTON(SDL_BUTTON_LEFT)){ buttons ^= 0x04; }
-    if (state & SDL_BUTTON(SDL_BUTTON_MIDDLE)){ buttons ^= 0x02; }
-    if (state & SDL_BUTTON(SDL_BUTTON_RIGHT)){ buttons ^= 0x01; }
-    
-    if(mouse_phase == 1 && buttons != mouse_last_buttons){
-      put_mouse_rx_ring(active_console,0);
-      put_mouse_rx_ring(active_console,0);
-      mouse_phase ^= 1;
-    }
-    // Construct packet
-    ym = -ym; // Y movement is reversed
-    // Scale movement
-    xm /= 2;
-    ym /= 2;
-    if(xm == 0 && ym == 0 && buttons == mouse_last_buttons){ return; }
-    // printf("MOUSE: Movement: %d/%d buttons 0x%.2x\n",xm,ym,buttons);
-    // Construct mouse packet and send it
-    if(mouse_phase == 0){    
-      put_mouse_rx_ring(active_console,0x80|buttons); // Buttons
-      put_mouse_rx_ring(active_console,xm&0xFF);
-      put_mouse_rx_ring(active_console,ym&0xFF);
-    }else{
-      put_mouse_rx_ring(active_console,xm&0xFF);
-      put_mouse_rx_ring(active_console,ym&0xFF);
-    }
-    mouse_phase ^= 1;
-    mouse_last_buttons = buttons;
-  }
-  if(mouse_op_mode == 1){
-    // Shared Mode
-    // If lisp is not running, return
-    if(cp_state[active_console] != 3){ return; }    
-    state = SDL_GetMouseState(&xm, &ym);
-    // If the inhibit counter is nonzero, throw away this update (it's fake)
-    if(mouse_update_inhibit > 0){ mouse_update_inhibit--; return; }
-    // Otherwise, proceed
-    if (state & SDL_BUTTON(SDL_BUTTON_LEFT)){ buttons ^= 0x04; }
-    if (state & SDL_BUTTON(SDL_BUTTON_MIDDLE)){ buttons ^= 0x02; }
-    if (state & SDL_BUTTON(SDL_BUTTON_RIGHT)){ buttons ^= 0x01; }
-    // printf("MOUSE: Movement: %d/%d buttons 0x%.2x\n",xm,ym,buttons);
-    // Do we need to update buttons?
-    if(buttons != mouse_last_buttons){
-      // Yes - Generate a mouse packet (no movement, just buttons)
-      if(mouse_phase == 1){
-	put_mouse_rx_ring(active_console,0);
-	put_mouse_rx_ring(active_console,0);
-	mouse_phase ^= 1;
-      }
-      put_mouse_rx_ring(active_console,0x80|buttons); // Buttons
-      put_mouse_rx_ring(active_console,0);
-      put_mouse_rx_ring(active_console,0);
-      mouse_phase ^= 1;      
-      mouse_last_buttons = buttons;
-    }else{
-      // No, update position
-      pS[active_console].Amemory[mouse_x_loc[active_console]] = 0xA000000|xm;
-      pS[active_console].Amemory[mouse_y_loc[active_console]] = 0xA000000|ym;
-      pS[active_console].Amemory[mouse_wake_loc[active_console]] = 0x6000005; // T
-    }
-  }
-}
-
-// Lisp updated the mouse position
-void warp_mouse_callback(int cp){
-  // Make sure we care first
-  if(mouse_op_mode != 1 || cp_state[cp] != 3 || cp != active_console){ return; }
-  mouse_update_inhibit++;
-  // printf("WARP MOUSE 0x%X,0x%X\n",pS[cp].Amemory[mouse_x_loc[cp]],pS[cp].Amemory[mouse_y_loc[cp]]);
-  SDL_WarpMouse((pS[cp].Amemory[mouse_x_loc[cp]]&0xFFFF),(pS[cp].Amemory[mouse_y_loc[cp]]&0xFFFF));
-}
-#endif
-
-void set_bow_mode(int vn,int mode){
-  int i,j;
-
-  if(black_on_white[vn] == mode){
-    // printf("BLACK-ON-WHITE MODE unchanged\n");
-    return;                   /* noop */
-  }
-  logmsgf(LT_VCMEM,10,"VC %d BLACK-ON-WHITE MODE now %d\n",vn,mode);
-  black_on_white[vn] = mode;  /* update */
-
-  // invert pixels
-  uint32_t *p = FB_Image[vn];
-  if(vn == active_console){
-    uint32_t *b = screen->pixels;
-    for (i = 0; i < video_width; i++) {
-      for (j = 0; j < video_height; j++) {
-	*b = *p = (*p == pixel_off ? pixel_on : pixel_off);
-	p++; b++;
-      }
-    }
-    // Refresh display
-    SDL_UpdateRect(screen, 0, 0, video_width, video_height);
-  }else{
-    for (i = 0; i < video_width; i++) {
-      for (j = 0; j < video_height; j++) {
-	*p = (*p == pixel_off ? pixel_on : pixel_off);
-	p++;
-      }
-    }
-  }
-}
-
-void accumulate_update(int h, int v, int hs, int vs){
-  if (h < u_minh) u_minh = h;
-  if (h+hs > u_maxh) u_maxh = h+hs;
-  if (v < u_minv) u_minv = v;
-  if (v+vs > u_maxv) u_maxv = v+vs;
-}
-
-void send_accumulated_updates(void){
-  int hs, vs;
-  
-  hs = u_maxh - u_minh;
-  vs = u_maxv - u_minv;
-  if (u_minh != 0x7fffffff && u_minv != 0x7fffffff &&
-      u_maxh && u_maxv)
-    {
-      SDL_UpdateRect(screen, u_minh, u_minv, hs, vs);
-    }
-  
-  u_minh = 0x7fffffff;
-  u_maxh = 0;
-  u_minv = 0x7fffffff;
-  u_maxv = 0;
-}
-
-void sdl_refresh(int vblank){
-  SDL_Event ev1, *ev = &ev1;
-  if(vblank != 0){
-    send_accumulated_updates();
-    return;
-  }
-
-  while (SDL_PollEvent(ev)) {
-    switch (ev->type) {
-    case SDL_VIDEOEXPOSE:
-      SDL_UpdateRect(screen, 0, 0, screen->w, screen->h);
-      break;
-
-    case SDL_KEYDOWN:
-      sdl_process_key(&ev->key, 1);
-      break;      
-    case SDL_KEYUP:
-      sdl_process_key(&ev->key, 0);
-      break;
-
-#ifndef CONFIG_PHYSMS
-    case SDL_MOUSEMOTION:
-    case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP:
-    case SDL_APPMOUSEFOCUS:
-      sdl_send_mouse_event();
-      break;
-#endif
-
-    case SDL_QUIT:
-      if(quit_on_sdl_quit != 0){
-	sdl_system_shutdown_request();
-      }
-      break;
-      
-    default:
-      break;
-    }
-  }
-}
-
-void sdl_cleanup(void){
-#ifndef CONFIG_PHYSMS
-  if(mouse_op_mode == 0){
-    SDL_WM_GrabInput(SDL_GRAB_OFF);
-  }
-  SDL_ShowCursor(SDL_ENABLE);
-#endif
-  if(sdu_conn_fd > 0){
-    close(sdu_conn_fd);
-  }
-  if(sdu_fd > 0){
-    close(sdu_fd);
-  }
-  write_nvram();
-  write_rtc_nvram();
-  SDL_Quit();
-}
-
-// Timer callback
-uint32_t sdl_timer_callback(uint32_t interval, void *param __attribute__ ((unused))){
-  // Real time passed
-  real_time++;
-  // Also increment status update counter
-  stat_time++;
-  // Return next interval
-  return(interval);
-}
-
-int sdl_init(int width, int height){
-  int i, j;
-
-  video_width = width;
-  video_height = height;
-
-  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE)){
-    fprintf(stderr, "SDL initialization failed\n");
-    exit(-1);
-  }
-
-  /* NOTE: we still want Ctrl-C to work - undo the SDL redirections*/
-  signal(SIGINT, SIG_DFL);
-  signal(SIGQUIT, SIG_DFL);
-
-  // Obtain icon. It must be a 32x32 pixel 256-color BMP image. RGB 255,0,255 is used for transparency.
-  SDL_Surface* icon = SDL_LoadBMP("icon.bmp");
-  if(icon != NULL){
-    SDL_SetColorKey(icon, SDL_SRCCOLORKEY, SDL_MapRGB(icon->format, 255, 0, 255));
-    SDL_WM_SetIcon(icon, 0);
-  }else{
-    printf("Failed to open icon.bmp");
-  }
-
-  // SDL was burning a bunch of time forcing 8bpp, so use 32bpp instead.
-  screen = SDL_SetVideoMode(width, height, 32, SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL);
-
-  if(!screen){
-    fprintf(stderr, "Could not open SDL display\n");
-    exit(-1);
-  }
-
-  ds->data = screen->pixels;
-  ds->linesize = screen->pitch;
-  ds->depth = screen->format->BitsPerPixel;
-  ds->width = width;
-  ds->height = height;
-
-  // Window title, then icon title (?)
-  SDL_WM_SetCaption("LambdaDelta", "LambdaDelta");
-
-  SDL_EnableKeyRepeat(250, 50);
-
-  // Clear display and stored bitmaps
-  uint32_t *p = screen->pixels;
-  for (i = 0; i < video_width; i++) {
-    for (j = 0; j < video_height; j++)
-      *p++ = pixel_off;
-  }
-  p = FB_Image[0];
-  for (i = 0; i < video_width; i++) {
-    for (j = 0; j < video_height; j++)
-      *p++ = pixel_off;
-  }
-  p = FB_Image[1];
-  for (i = 0; i < video_width; i++) {
-    for (j = 0; j < video_height; j++)
-      *p++ = pixel_off;
-  }
-  // Redraw it
-  SDL_UpdateRect(screen, 0, 0, video_width, video_height);
-
-#ifndef CONFIG_PHYSMS
-  // Grab the mouse if we are in direct mode
-  if(mouse_op_mode == 0){
-    SDL_WM_GrabInput(SDL_GRAB_ON);
-  }
-  SDL_ShowCursor(SDL_DISABLE);
-#endif
-  atexit(sdl_cleanup);
-
-  // Kick interval timer
-  SDLTimer = SDL_AddTimer(100,sdl_timer_callback,NULL);
-  if(SDLTimer == NULL){
-    fprintf(stderr,"Unable to start interval timer\n");
-    exit(-1);
-  }
-
-  return(0);
-}
-
-// Framebuffer management
-void framebuffer_update_word(int vn,uint32_t addr,uint32_t data){
-  // Given 1BPP data and a vcmem framebuffer address, translate to 32BPP and write to host
-  uint32_t row,col;  // Row and column of guest write
-  uint32_t outpos;   // Actual host FB offset
-  uint64_t mask = 1; // Mask for pixel state
-  uint32_t *FrameBuffer; // Address of framebuffer
-
-  col = addr*8;      // This many pixels in
-  row = (col/1024);  // Obtain row
-  col -= (row*1024); // Remove row pixels
-  FrameBuffer = (uint32_t *)screen->pixels;
-
-  outpos = col+((screen->pitch/4)*row);
-
-  if(outpos >= (uint32_t)(video_width*video_height)){
-    return;
-  }
-
-  if(active_console == vn){
-    while(mask < 0x100000000LL){
-      if((black_on_white[vn] == 0 && (data&mask) != mask) || (black_on_white[vn] == 1 && (data&mask) == mask)){
-	FB_Image[vn][outpos] = FrameBuffer[outpos] = pixel_on;
-      }else{
-	FB_Image[vn][outpos] = FrameBuffer[outpos] = pixel_off;
-      }  
-      outpos++;
-      mask <<= 1;
-    }
-    accumulate_update(col, row, 32, 1);
-  }else{
-    while(mask < 0x100000000LL){
-      if((black_on_white[vn] == 0 && (data&mask) != mask) || (black_on_white[vn] == 1 && (data&mask) == mask)){
-	FB_Image[vn][outpos] = pixel_on;
-      }else{
-	FB_Image[vn][outpos] = pixel_off;
-      }  
-      outpos++;
-      mask <<= 1;
-    }
-  }
-}
-
-void framebuffer_update_hword(int vn,uint32_t addr,uint16_t data){
-  uint32_t row,col;  // Row and column of guest write
-  uint32_t outpos;   // Actual host FB offset
-  uint64_t mask = 1; // Mask for pixel state
-  uint32_t *FrameBuffer; // Address of framebuffer
-
-  col = addr*8;      // This many pixels in
-  row = (col/1024);  // Obtain row
-  col -= (row*1024); // Remove row pixels
-  FrameBuffer = (uint32_t *)screen->pixels;
-
-  outpos = col+((screen->pitch/4)*row);
-
-  if(outpos >= (uint32_t)(video_width*video_height)){
-    return;
-  }
-
-  if(active_console == vn){
-    while(mask < 0x10000LL){
-      if((black_on_white[vn] == 0 && (data&mask) != mask) || (black_on_white[vn] == 1 && (data&mask) == mask)){
-	FB_Image[vn][outpos] = FrameBuffer[outpos] = pixel_on;	
-      }else{
-	FB_Image[vn][outpos] = FrameBuffer[outpos] = pixel_off;
-      }  
-      outpos++;
-      mask <<= 1;
-    }
-    accumulate_update(col, row, 16, 1);
-  }else{
-    while(mask < 0x10000LL){
-      if((black_on_white[vn] == 0 && (data&mask) != mask) || (black_on_white[vn] == 1 && (data&mask) == mask)){
-	FB_Image[vn][outpos] = pixel_on;
-      }else{
-	FB_Image[vn][outpos] = pixel_off;
-      }  
-      outpos++;
-      mask <<= 1;
-    }
-  }
-}
-
-void framebuffer_update_byte(int vn,uint32_t addr,uint8_t data){
-  // Given 1BPP data and a vcmem framebuffer address, translate to 32BPP and write to host
-  uint32_t row,col;  // Row and column of guest write
-  uint32_t outpos;   // Actual host FB offset
-  uint32_t mask = 1; // Mask for pixel state
-  uint32_t *FrameBuffer; // Address of framebuffer
-
-  col = addr*8;      // This many pixels in
-  row = (col/1024);  // Obtain row
-  col -= (row*1024); // Remove row pixels
-  FrameBuffer = (uint32_t *)screen->pixels;
-
-  outpos = col+((screen->pitch/4)*row);
-
-  if(outpos >= (uint32_t)(video_width*video_height)){
-    return;
-  }
-
-  if(active_console == vn){
-    while(mask < 0x100){
-      if((black_on_white[vn] == 0 && (data&mask) != mask) || (black_on_white[vn] == 1 && (data&mask) == mask)){
-	FB_Image[vn][outpos] = FrameBuffer[outpos] = pixel_on;
-      }else{
-	FB_Image[vn][outpos] = FrameBuffer[outpos] = pixel_off;	
-      }    
-      outpos++;
-      mask <<= 1;
-    }
-    accumulate_update(col, row, 8, 1);
-  }else{
-    while(mask < 0x100){
-      if((black_on_white[vn] == 0 && (data&mask) != mask) || (black_on_white[vn] == 1 && (data&mask) == mask)){
-        FB_Image[vn][outpos] = pixel_on;
-      }else{
-        FB_Image[vn][outpos] = pixel_off;
-      }
-      outpos++;
-      mask <<= 1;
-    }
-  }
-}
-
-#endif /* SDL1 code */
-
-#ifdef SDL2
 void kbd_handle_char(int scancode, int down){
   int sdlchar = scancode;
   unsigned char outchar=0;
@@ -1347,15 +631,15 @@ void kbd_handle_char(int scancode, int down){
       if(mouse_capture != 0){
         mouse_capture = 0;
 	if(mouse_op_mode == 0){
-	  SDL_SetRelativeMouseMode(SDL_FALSE);
+	  SDL_SetWindowRelativeMouseMode(SDLWindow, false);
 	}
-	SDL_ShowCursor(SDL_ENABLE);
+	SDL_ShowCursor();
       }else{
         mouse_capture = 1;
 	if(mouse_op_mode == 0){
-	  SDL_SetRelativeMouseMode(SDL_TRUE);
+	  SDL_SetWindowRelativeMouseMode(SDLWindow, true);
 	}
-	SDL_ShowCursor(SDL_DISABLE);
+	SDL_HideCursor();
       }
     }
   }
@@ -1379,10 +663,7 @@ void kbd_handle_char(int scancode, int down){
           *p++ = *s++;
       }
       // Redraw it
-      SDL_UpdateTexture(SDLTexture, NULL, FrameBuffer, (VIDEO_WIDTH*4));
-      SDL_RenderClear(SDLRenderer);
-      SDL_RenderCopy(SDLRenderer, SDLTexture, NULL, NULL);
-      SDL_RenderPresent(SDLRenderer);
+      sdl_present();
 
       // Reset accumulation
       u_minh = 0x7fffffff; u_maxh = 0; u_minv = 0x7fffffff; u_maxv = 0;
@@ -1439,24 +720,27 @@ void sdl_system_shutdown_request(void){
 }
 
 static void sdl_process_key(SDL_KeyboardEvent *ev, int updown){
-  kbd_handle_char(ev->keysym.scancode, updown);
+  kbd_handle_char(ev->scancode, updown);
 }
 
 #ifndef CONFIG_PHYSMS
 static void sdl_send_mouse_event(void){
-  int state,xm,ym;
+  SDL_MouseButtonFlags state;
+  float fx,fy;
+  int xm,ym;
   uint8_t buttons=0x07;
   if(mouse_op_mode == 0){
     // Direct Mode
-    state = SDL_GetRelativeMouseState(&xm, &ym);
+    state = SDL_GetRelativeMouseState(&fx, &fy);
+    xm = (int)fx; ym = (int)fy;
     // Disregard mouse when not captured, unless we are recapturing it.
-    if(mouse_capture == 0 && (state & SDL_BUTTON(SDL_BUTTON_LEFT))){
+    if(mouse_capture == 0 && (state & SDL_BUTTON_MASK(SDL_BUTTON_LEFT))){
       mouse_capture = 2;
       return;
     }
-    if(mouse_capture == 2 && !(state & SDL_BUTTON(SDL_BUTTON_LEFT))){
+    if(mouse_capture == 2 && !(state & SDL_BUTTON_MASK(SDL_BUTTON_LEFT))){
       mouse_capture = 1;
-      SDL_SetRelativeMouseMode(SDL_TRUE);
+      SDL_SetWindowRelativeMouseMode(SDLWindow, true);
       return;
     }
     if(mouse_capture != 1){
@@ -1465,9 +749,9 @@ static void sdl_send_mouse_event(void){
     // if(!mouse_init){ return; }
     if(cp_state[active_console] != 3){ return; }
     // Proceed
-    if (state & SDL_BUTTON(SDL_BUTTON_LEFT)){ buttons ^= 0x04; }
-    if (state & SDL_BUTTON(SDL_BUTTON_MIDDLE)){ buttons ^= 0x02; }
-    if (state & SDL_BUTTON(SDL_BUTTON_RIGHT)){ buttons ^= 0x01; }
+    if (state & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)){ buttons ^= 0x04; }
+    if (state & SDL_BUTTON_MASK(SDL_BUTTON_MIDDLE)){ buttons ^= 0x02; }
+    if (state & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT)){ buttons ^= 0x01; }
     
     if(mouse_phase == 1 && buttons != mouse_last_buttons){
       put_mouse_rx_ring(active_console,0);
@@ -1497,13 +781,20 @@ static void sdl_send_mouse_event(void){
     // Shared Mode
     // If lisp is not running, return
     if(cp_state[active_console] != 3){ return; }
-    state = SDL_GetMouseState(&xm, &ym);
+    state = SDL_GetMouseState(&fx, &fy);
+    // The window may be scaled; convert to Lambda screen coordinates
+    SDL_RenderCoordinatesFromWindow(SDLRenderer, fx, fy, &fx, &fy);
+    xm = (int)fx; ym = (int)fy;
+    if(xm < 0){ xm = 0; }
+    if(xm >= video_width){ xm = video_width-1; }
+    if(ym < 0){ ym = 0; }
+    if(ym >= video_height){ ym = video_height-1; }
     // If the inhibit counter is nonzero, throw away this update (it's fake)
     if(mouse_update_inhibit > 0){ mouse_update_inhibit--; return; }
     // Otherwise, proceed
-    if (state & SDL_BUTTON(SDL_BUTTON_LEFT)){ buttons ^= 0x04; }
-    if (state & SDL_BUTTON(SDL_BUTTON_MIDDLE)){ buttons ^= 0x02; }
-    if (state & SDL_BUTTON(SDL_BUTTON_RIGHT)){ buttons ^= 0x01; }
+    if (state & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)){ buttons ^= 0x04; }
+    if (state & SDL_BUTTON_MASK(SDL_BUTTON_MIDDLE)){ buttons ^= 0x02; }
+    if (state & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT)){ buttons ^= 0x01; }
     // printf("MOUSE: Movement: %d/%d buttons 0x%.2x\n",xm,ym,buttons);
     // Do we need to update buttons?
     if(buttons != mouse_last_buttons){
@@ -1537,7 +828,12 @@ void warp_mouse_callback(int cp){
   mouse_update_inhibit++;
   if(mouse_update_inhibit > 10){ mouse_update_inhibit = 10; } // Cap this?
   // printf("WARP MOUSE 0x%X,0x%X\n",pS[cp].Amemory[mouse_x_loc[cp]],pS[cp].Amemory[mouse_y_loc[cp]]);
-  SDL_WarpMouseInWindow(SDLWindow,(pS[cp].Amemory[mouse_x_loc[cp]]&0xFFFF),(pS[cp].Amemory[mouse_y_loc[cp]]&0xFFFF));
+  float wx,wy;
+  SDL_RenderCoordinatesToWindow(SDLRenderer,
+				(float)(pS[cp].Amemory[mouse_x_loc[cp]]&0xFFFF),
+				(float)(pS[cp].Amemory[mouse_y_loc[cp]]&0xFFFF),
+				&wx,&wy);
+  SDL_WarpMouseInWindow(SDLWindow,wx,wy);
 }
 #endif
 
@@ -1562,10 +858,7 @@ void set_bow_mode(int vn,int mode){
       }
     }
     // Refresh display
-    SDL_UpdateTexture(SDLTexture, NULL, FrameBuffer, (VIDEO_WIDTH*4));
-    SDL_RenderClear(SDLRenderer);
-    SDL_RenderCopy(SDLRenderer, SDLTexture, NULL, NULL);
-    SDL_RenderPresent(SDLRenderer);
+    sdl_present();
   }else{
     for (i = 0; i < VIDEO_WIDTH; i++) {
       for (j = 0; j < MAX_VIDEO_HEIGHT; j++) {
@@ -1590,40 +883,36 @@ void sdl_refresh(int vblank){
 
   // Refresh display
   if(vblank != 0){
-    SDL_UpdateTexture(SDLTexture, NULL, FrameBuffer, (VIDEO_WIDTH*4));
-    SDL_RenderClear(SDLRenderer);
-    SDL_RenderCopy(SDLRenderer, SDLTexture, NULL, NULL);
-    SDL_RenderPresent(SDLRenderer);
+    sdl_present();
     return;
   }
 
   // Handle input
   while (SDL_PollEvent(ev)) {
     switch (ev->type) {
-    case SDL_WINDOWEVENT_EXPOSED:
-      // SDL_UpdateRect(screen, 0, 0, screen->w, screen->h);
-      // Instead of this cause the entire screen to update regardless of the accumulated coordinates.
+    case SDL_EVENT_WINDOW_EXPOSED:
+      sdl_present();
       break;
 
-    case SDL_KEYDOWN:
+    case SDL_EVENT_KEY_DOWN:
       sdl_process_key(&ev->key, 1);
       break;
-    case SDL_KEYUP:
+    case SDL_EVENT_KEY_UP:
       sdl_process_key(&ev->key, 0);
       break;
 
-    case SDL_QUIT:
+    case SDL_EVENT_QUIT:
       if(quit_on_sdl_quit != 0){
 	sdl_system_shutdown_request();
       }
       break;
 
 #ifndef CONFIG_PHYSMS
-    case SDL_MOUSEMOTION:
-    case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP:
-    case SDL_WINDOWEVENT_ENTER:
-    case SDL_WINDOWEVENT_LEAVE:
+    case SDL_EVENT_MOUSE_MOTION:
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+    case SDL_EVENT_WINDOW_MOUSE_ENTER:
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
       sdl_send_mouse_event();
       break;
 #endif
@@ -1637,9 +926,9 @@ void sdl_refresh(int vblank){
 static void sdl_cleanup(void){
 #ifndef CONFIG_PHYSMS
   if(mouse_op_mode == 0){
-    SDL_SetRelativeMouseMode(SDL_FALSE);
+    SDL_SetWindowRelativeMouseMode(SDLWindow, false);
   }
-  SDL_ShowCursor(SDL_ENABLE);
+  SDL_ShowCursor();
 #endif
   if(sdu_conn_fd > 0){
     close(sdu_conn_fd);
@@ -1655,17 +944,13 @@ static void sdl_cleanup(void){
   SDL_Quit();
 }
 
-// Timer callback
-uint32_t sdl_timer_callback(uint32_t interval, void *param __attribute__ ((unused))){
-  // Real time passed
-  real_time++;
-  // Also increment status update counter
-  stat_time++;
-  // Return next interval
-  return(interval);
+// SIGUSR1 requests a screenshot (handy when running without a usable display)
+static volatile sig_atomic_t screenshot_request = 0;
+static void screenshot_signal(int signum __attribute__ ((unused))){
+  screenshot_request = 1;
 }
 
-// New timer callback because SDL2's interval timer sucks
+// Interval timer callback
 // Gets called every 100000 microseconds (so 10 times a second)
 static void itimer_callback(int signum __attribute__ ((unused))){
   // Real time passed
@@ -1675,14 +960,11 @@ static void itimer_callback(int signum __attribute__ ((unused))){
 }
 
 int sdl_init(int width, int height){
-  int flags;
   int i,j;
   struct sigaction sigact;
 
-  flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO;
-
-  if (SDL_Init(flags)) {
-    fprintf(stderr, "SDL initialization failed\n");
+  if (!SDL_Init(SDL_INIT_VIDEO)) {
+    fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
     exit(1);
   }
 
@@ -1695,19 +977,18 @@ int sdl_init(int width, int height){
   sigemptyset(&sigact.sa_mask);
   sigact.sa_flags = SA_RESTART; // Attempt to restart syscalls interrupted by this signal
   sigaction(SIGALRM,&sigact,NULL);
+  // And SIGUSR1 for screenshots
+  sigact.sa_handler = screenshot_signal;
+  sigaction(SIGUSR1,&sigact,NULL);
 
   // Create window
-  SDLWindow = SDL_CreateWindow("LambdaDelta",
-                               SDL_WINDOWPOS_CENTERED,
-                               SDL_WINDOWPOS_CENTERED,
-                               width, height,
-                               0);
+  SDLWindow = SDL_CreateWindow("LambdaDelta", width, height, SDL_WINDOW_RESIZABLE);
   if(SDLWindow == NULL){
     printf("SDL_CreateWindow(): %s\n",SDL_GetError());
     return(-1);
   }
   // And renderer
-  SDLRenderer = SDL_CreateRenderer(SDLWindow, -1, 0);
+  SDLRenderer = SDL_CreateRenderer(SDLWindow, NULL);
   if(SDLRenderer == NULL){
     printf("SDL_CreateRenderer(): %s\n",SDL_GetError());
     return(-1);
@@ -1716,16 +997,16 @@ int sdl_init(int width, int height){
   // Obtain icon. It must be a 32x32 pixel 256-color BMP image. RGB 255,0,255 is used for transparency.
   SDL_Surface* icon = SDL_LoadBMP("icon.bmp");
   if(icon != NULL){
-    SDL_SetColorKey(icon, SDL_TRUE, SDL_MapRGB(icon->format, 255, 0, 255));
+    SDL_SetSurfaceColorKey(icon, true, SDL_MapSurfaceRGB(icon, 255, 0, 255));
     SDL_SetWindowIcon(SDLWindow, icon);
-    SDL_FreeSurface(icon);
+    SDL_DestroySurface(icon);
   }else{
-    printf("Failed to open icon.bmp");
+    printf("Failed to open icon.bmp\n");
   }
 
   // Do some setting
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
-  SDL_RenderSetLogicalSize(SDLRenderer, width, height);
+  // The window may be resized; the Lambda screen is scaled to fit, preserving aspect ratio.
+  SDL_SetRenderLogicalPresentation(SDLRenderer, width, height, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
   printf("SDL display width %d height %d\n", width, height);
 
@@ -1738,6 +1019,7 @@ int sdl_init(int width, int height){
     printf("SDL_CreateTexture(): %s\n",SDL_GetError());
     return(-1);
   }
+  SDL_SetTextureScaleMode(SDLTexture, SDL_SCALEMODE_LINEAR);  // make the scaled rendering look smoother.
 
   // Clean up if we die
   atexit(sdl_cleanup);
@@ -1762,19 +1044,12 @@ int sdl_init(int width, int height){
 #ifndef CONFIG_PHYSMS
   // Grab the mouse if we are in direct mode
   if(mouse_op_mode == 0){
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetWindowRelativeMouseMode(SDLWindow, true);
   }
-  SDL_ShowCursor(SDL_DISABLE);
+  SDL_HideCursor();
 #endif
 
   // Kick interval timer
-  /*
-  SDLTimer = SDL_AddTimer(100,sdl_timer_callback,NULL);
-  if(SDLTimer == 0){
-    fprintf(stderr,"Unable to start interval timer\n");
-    exit(-1);
-  }
-  */
   struct itimerval itv;
   bzero((uint8_t *)&itv,sizeof(struct itimerval));
   itv.it_interval.tv_usec = 100000;
@@ -1908,7 +1183,6 @@ void framebuffer_update_byte(int vn,uint32_t addr,uint8_t data){
   }
 }
 
-#endif /* SDL2 code */
 
 void read_sdu_rom(){
   extern uint8_t SDU_ROM[];
@@ -2431,7 +1705,13 @@ void sdu_cons_clockpulse(){
       }
       return;
     }
-    if(res == 0){ return; } // What?
+    if(res == 0){
+      // The other end hung up. Drop the connection so a new one can be accepted.
+      printf("SDUCONS: Connection closed\n");
+      close(sdu_conn_fd);
+      sdu_conn_fd = -1;
+      return;
+    }
     if(res != 1){
       printf("SDUCONS: BAD PACKET? Got %d bytes\n",(int)res);
       return;
@@ -2874,7 +2154,6 @@ void map_key(int sval, int dval){
 }
 
 #ifdef XBEEP
-#ifdef SDL2
 // SDL Audio beep code.
 // This code is based on https://stackoverflow.com/a/45002609
 // It can probably be adjusted and optimized.
@@ -2886,42 +2165,54 @@ const int SAMPLE_RATE = 44100;
 int xbeep_sample_nr = 0;
 float xbeep_freq = 0.0f;
 
-// The callback to produce the sine wave.
-void xbeep_audio_callback(void *user_data, Uint8 *raw_buffer, int bytes)
+static SDL_AudioStream *xbeep_stream = NULL;
+
+// The callback to produce the sine wave. SDL calls this when the stream needs more data.
+static void xbeep_audio_callback(void *user_data, SDL_AudioStream *stream, int additional_amount,
+				 int total_amount __attribute__ ((unused)))
 {
-    Sint16 *buffer = (Sint16*)raw_buffer;
-    int length = bytes / 2; // 2 bytes per sample for AUDIO_S16SYS
+    Sint16 buffer[1024];
     float *freq = (float *)(user_data);
     int amp = AMPLITUDE * xbeep_volume;
+    int remaining = additional_amount / 2; // 2 bytes per sample for SDL_AUDIO_S16
 
-    for(int i = 0; i < length; i++, xbeep_sample_nr++)
+    while(remaining > 0)
     {
-        double time = (double)xbeep_sample_nr / (double)SAMPLE_RATE;
-        buffer[i] = (Sint16)(amp * sin(2.0f * M_PI * (*freq) * time)); // render sine wave
+        int length = remaining > 1024 ? 1024 : remaining;
+        for(int i = 0; i < length; i++, xbeep_sample_nr++)
+        {
+            double time = (double)xbeep_sample_nr / (double)SAMPLE_RATE;
+            buffer[i] = (Sint16)(amp * sin(2.0f * M_PI * (*freq) * time)); // render sine wave
+        }
+        SDL_PutAudioStreamData(stream, buffer, length * 2);
+        remaining -= length;
     }
 }
 
-// Opens the audio, called by sdl_init
+// Opens the audio, called by sdl_init. Failure is not fatal; we just won't beep.
 void xbeep_audio_init() {
   SDL_AudioSpec want;
+
+  if(!SDL_InitSubSystem(SDL_INIT_AUDIO)){
+    SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to initialize audio: %s", SDL_GetError());
+    return;
+  }
   want.freq = SAMPLE_RATE; // number of samples per second
-  want.format = AUDIO_S16SYS; // sample type (here: signed short i.e. 16 bit)
+  want.format = SDL_AUDIO_S16; // sample type (here: signed short i.e. 16 bit)
   want.channels = 1; // only one channel
-  want.samples = 2048; // buffer-size
-  want.callback = xbeep_audio_callback; // function SDL calls periodically to refill the buffer
-  want.userdata = &xbeep_freq; // counter, keeping track of current sample number
 
-  SDL_AudioSpec have;
-  if(SDL_OpenAudio(&want, &have) != 0) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s", SDL_GetError());
-  if(want.format != have.format) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to get the desired AudioSpec");
-
-  // pause it just to be on the safe side?
-  SDL_PauseAudio(1);
+  // The device starts out paused.
+  xbeep_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &want,
+					   xbeep_audio_callback, &xbeep_freq);
+  if(xbeep_stream == NULL) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s", SDL_GetError());
 }
 
 // close the audio, called by sdl_cleanup. (Not really necessary since SDL_Quit appears just after...)
 void xbeep_audio_close() {
-  SDL_CloseAudio();
+  if(xbeep_stream != NULL){
+    SDL_DestroyAudioStream(xbeep_stream);
+    xbeep_stream = NULL;
+  }
 }
 
 // Here is the main function to implement the %BEEP instruction, which originally calls the
@@ -2951,13 +2242,12 @@ void xbeep(int halfwavelength, int duration) {
   xbeep_freq = 1000000.0f / (float)(halfwavelength*2);
   xbeep_sample_nr = 0;
 
-  SDL_PauseAudio(0); // start playing sound
+  if(xbeep_stream == NULL){ return; }
+  SDL_ResumeAudioStreamDevice(xbeep_stream); // start playing sound
   SDL_Delay(duration/1000); // wait while sound is playing
-  SDL_PauseAudio(1); // stop playing sound
+  SDL_PauseAudioStreamDevice(xbeep_stream); // stop playing sound
+  SDL_ClearAudioStream(xbeep_stream); // drop anything still queued
 }
-#else
-// Non-SDL2 XBEEP goes here
-#endif // SDL1 vs SLD2 XBEEP
 #else // XBEEP vs. console beep
 // Use console beep instead of XBEEP
 // Handle writes to keyboard control reg #5 to click/not (cf vcmem.c)
@@ -3241,8 +2531,7 @@ void parse_config_line(char *line){
     tok = strtok(NULL," \t\r\n");
     if(tok != NULL){
       int sval = atoi(tok);
-#ifdef SDL2
-      // Parse SDL key names (could be implemented for SDL1 separately, standard for SDL2)
+      // Parse SDL key names
       if (sval == 0) {
 	// SDL key names sometimes have space in them (keypad X, left/right X) so replace _ by ' '
 	char *usc;
@@ -3255,7 +2544,6 @@ void parse_config_line(char *line){
 	  return;
 	}
       }
-#endif
       tok = strtok(NULL," \t\r\n");
       if(tok != NULL){
 	int dval = strtol(tok,NULL,8);
@@ -3268,25 +2556,16 @@ void parse_config_line(char *line){
 	  }
 	}
 	map_key(sval,dval);
-#ifdef SDL2
 	printf("Mapped SDL keycode %d (%s) to Lambda keycode 0%o (%s)\n",
 	       sval, SDL_GetScancodeName(sval), dval, lm_key_names[dval].lmkey_name);
-#else
-	printf("Mapped SDL keycode %d to Lambda keycode 0%o (%s)\n",sval,dval, lm_key_names[dval].lmkey_name);
-#endif
       }else{
 	printf("key_map: Missing octal Lambda key code or key name.\n");
       }
     }else{
-#ifdef SDL2
       printf("key_map: Missing decimal SDL keycode value or key name\n");
-#else
-      printf("key_map: Missing decimal SDL keycode value\n");
-#endif
     }
   }
 #ifdef XBEEP
-#ifdef SDL2
   if (strcasecmp(tok,"audio_volume") == 0) {
     // Set audio volume (0.0-1.0)
     tok = strtok(NULL, " \t\r\n");
@@ -3296,9 +2575,6 @@ void parse_config_line(char *line){
     }
     return;
   }
-#else
-  // SDL1 XBEEP here
-#endif
 #endif // XBEEP
   if(strcasecmp(tok,"log") == 0){
     // Alter log levels
@@ -3574,12 +2850,8 @@ int yaml_keyboard_sequence_loop(yaml_parser_t *parser){
       // Map entry end. Do it.
       if ((sval != 0) && (dval > 0)) {
 	map_key(sval,dval);
-#ifdef SDL2
 	printf("keyboard: Mapped SDL keycode %d (%s) to Lambda keycode %#o (%s)\n",
 	       sval, SDL_GetScancodeName(sval), dval, lm_key_names[dval].lmkey_name);
-#else
-	printf("keyboard: Mapped SDL keycode %d to Lambda keycode %#o (%s)\n",sval,dval, lm_key_names[dval].lmkey_name);
-#endif
       }
       break;
     case YAML_ALIAS_EVENT:
@@ -3594,8 +2866,7 @@ int yaml_keyboard_sequence_loop(yaml_parser_t *parser){
 	// printf("keyboard: key %s = value %s\n",key,value);
         if(strcmp(key,"sdl") == 0){
 	  sval = atoi(value);
-#ifdef SDL2
-	  // Parse SDL key names (could be implemented for SDL1 separately, standard for SDL2)
+	  // Parse SDL key names
 	  if (sval == 0) {
 	    // SDL key names sometimes have space in them (keypad X, left/right X) so replace _ by ' '
 	    char *usc;
@@ -3608,7 +2879,6 @@ int yaml_keyboard_sequence_loop(yaml_parser_t *parser){
 	      goto value_done;
 	    }
 	  }
-#endif
 	  goto value_done;
 	}
 	if(strcmp(key,"lambda") == 0){
@@ -3731,8 +3001,7 @@ int yaml_keyboard_mapping_loop(yaml_parser_t *parser){
 	if(strcmp(key,"map") == 0){
 	  if(value[0] != 0){	    
 	    int sval = atoi(value);
-#ifdef SDL2
-	    // Parse SDL key names (could be implemented for SDL1 separately, standard for SDL2)
+	    // Parse SDL key names
 	    if (sval == 0) {
 	      char *sdlk = strdup(value);
 	      char *space = strchr(sdlk, ' ');
@@ -3750,7 +3019,6 @@ int yaml_keyboard_mapping_loop(yaml_parser_t *parser){
 		goto value_done;
 	      }
 	    }
-#endif
 	    char *tok = strchr(value, ' ');
 	    if (tok == NULL) {
 	      printf("keyboard: map: missing Lambda key\n");
@@ -3770,12 +3038,8 @@ int yaml_keyboard_mapping_loop(yaml_parser_t *parser){
 	      }
 	      if ((sval != 0) && (dval > 0)) {
 		map_key(sval,dval); 
-#ifdef SDL2
 		printf("keyboard: Mapped SDL keycode %d (%s) to Lambda keycode %#o (%s)\n",
 		       sval, SDL_GetScancodeName(sval), dval, lm_key_names[dval].lmkey_name);
-#else
-		printf("keyboard: Mapped SDL keycode %d to Lambda keycode %#o (%s)\n",sval,dval, lm_key_names[dval].lmkey_name);
-#endif
 	      }
 	    }else{
 	      printf("keyboard: map: Missing octal Lambda key code.\n");
@@ -3900,7 +3164,6 @@ int yaml_video_mapping_loop(yaml_parser_t *parser){
   return(0); 
 }
 
-#ifdef SDL2
 int yaml_audio_mapping_loop(yaml_parser_t *parser){
   char key[128];
   char value[128];
@@ -3971,7 +3234,6 @@ int yaml_audio_mapping_loop(yaml_parser_t *parser){
   }
   return(0); 
 }
-#endif
 
 #ifndef CONFIG_PHYSMS
 int yaml_mouse_sequence_loop(yaml_parser_t *parser){
@@ -4327,12 +3589,10 @@ int yaml_event_loop(yaml_parser_t *parser){
 	rv = yaml_video_mapping_loop(parser);
 	goto map_done;
       }
-#ifdef SDL2
       if (strcmp(key,"audio") == 0) {
 	rv = yaml_audio_mapping_loop(parser);
 	goto map_done;
       }
-#endif
 #ifndef CONFIG_PHYSMS
       if(strcmp(key,"mouse") == 0){
 	rv = yaml_mouse_mapping_loop(parser);
@@ -4494,13 +3754,8 @@ int main(int argc, char *argv[]){
   }
   
   // Read default keymap
-#ifdef SDL1
-  init_sdl_to_keysym_map();
-#endif
 
-#ifdef SDL2
   init_sdl_to_scancode_map();
-#endif
 
   // Obtain configuration
 #ifndef HAVE_YAML_H
@@ -4751,6 +4006,11 @@ int main(int argc, char *argv[]){
       sdu_cons_clockpulse();
     }
     // Update status line
+    if(screenshot_request != 0){
+      screenshot_request = 0;
+      FB_dump(0);
+      FB_dump(1);
+    }
     if(stat_time > 9){
       char statbuf[3][64];
       char titlebuf[256];
@@ -4790,14 +4050,9 @@ int main(int argc, char *argv[]){
 	sprintf(statbuf[1],"Unknown State %d",cp_state[active_console]);
 	break;
       }
-      sprintf(statbuf[2]," | DT %lld",(emu_time-real_time));
+      sprintf(statbuf[2]," | DT %lld",(long long)(emu_time-real_time));
       sprintf(titlebuf,"%s%s%s",statbuf[0],statbuf[1],statbuf[2]);
-#ifdef SDL1
-      SDL_WM_SetCaption(titlebuf, "LambdaDelta");
-#endif
-#ifdef SDL2
       SDL_SetWindowTitle(SDLWindow, titlebuf);
-#endif
       stat_time = 0;
     }
     // Emulated time passed

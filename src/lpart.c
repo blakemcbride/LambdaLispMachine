@@ -485,7 +485,7 @@ usage(void)
 extern char *optarg;
 extern int optind;
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	int c, need_write;
 	char *partition;

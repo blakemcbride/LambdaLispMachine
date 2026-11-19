@@ -95,6 +95,6 @@
   Maps host key HV to Lambda key LV.
   HV is a decimal SDL key code, LV is an octal Lambda key code.
   See the KEYCODES file in the doc directory for a list of Lambda key codes.
-  See the SDL documentation for your SDL version to find the SDL key codes.
-  SDL1 codes start with SDLK_ and SDL2 codes start with SDL_SCANCODE_.
+  See the SDL3 documentation to find the SDL key codes.
+  These are SDL3 scancodes, which start with SDL_SCANCODE_.
   The default keymap is described later in this document.
