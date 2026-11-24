@@ -8,6 +8,9 @@ THE RINGLEADERS: ("The Usual Suspects")
 OUR VICTIMS: (We borrowed code from...)
 
    Brad Parker <brad@heeltoe.com>		 lpart tool
+   Björn Victor					 Locally administered addresses,
+						 autostart, YAML settings
+   Alfred M. Szmidt				 tumbleweed.nu fork fixes and notes
    Greg Gilley					 Symbol handling code   
    Mike Chambers				 Fake86 CPU core   
 

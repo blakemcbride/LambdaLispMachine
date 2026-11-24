@@ -32,6 +32,7 @@
 #include <string.h>
 #include <errno.h>
 #include <utime.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -572,7 +573,7 @@ void walkdir(DIR *d,char *path){
   char nextpath[1024];
   DIR *nextdir = NULL;
   struct dirent *ent;
-  while(ent = readdir(d)){
+  while((ent = readdir(d))){
     // Is this a directory? (linux/bsd specific)
     if(ent->d_type == DT_DIR){
       // If it starts with a dot, disregard it.

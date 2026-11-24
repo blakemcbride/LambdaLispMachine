@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -37,11 +38,14 @@
 #include <errno.h>
 #include <pwd.h>
 #include <termios.h>
+#include <math.h>
 
 // TCP socket
 #include <netinet/in.h>
 #include <netdb.h> 
 #include <sys/socket.h>
+
+#include <net/if.h>
 
 #ifdef HAVE_YAML_H
 // YAML
@@ -102,12 +106,12 @@ int debug_log_enable = 0;
 int debug_log_trigger = 0;
 int dump_seq = 0;
 #ifdef CONFIG_PHYSKBD
-char kbd_filename[128] = {"/dev/ttyS0"}; // File name for physical keyboard serial port
+char kbd_filename[PATH_MAX] = {"/dev/ttyS0"}; // File name for physical keyboard serial port
 int kbd_fd = -1;                         // File desc for physical keyboard serial port
 speed_t kbd_baudrate = B9600;            // Baud rate for physical keyboard serial port
 #endif
 #ifdef CONFIG_PHYSMS
-char ms_filename[128] = {"/dev/ttyS0"}; // File name for physical mouse serial port
+char ms_filename[PATH_MAX] = {"/dev/ttyS0"}; // File name for physical mouse serial port
 int ms_fd = -1;                         // File desc for physical mouse serial port
 speed_t ms_baudrate = B1200;            // Baud rate for physical mouse serial port
 #endif
@@ -340,7 +344,7 @@ int video_height = DEFAULT_VIDEO_HEIGHT;
 // Debug state and interface
 uint8_t debug_target_mode = 0;
 uint8_t debug_master_mode = 0;
-char debug_target_host[128] = "localhost";
+char debug_target_host[MAXHOSTNAMELEN] = "localhost";
 uint8_t debug_io_state = 0;
 uint8_t debug_rx_buf[64];
 uint32_t debug_last_addr = 0;
@@ -727,6 +731,38 @@ void kbd_handle_char(int scancode, int down){
   }
   // Send result
   put_rx_ring(active_console,outchar);
+}
+
+// Type one unshifted ASCII character (or '\n' for Return) on the Lambda keyboard.
+static void kbd_simulate_char(char ch){
+  char k[2] = { ch, 0 };
+  SDL_Scancode c;
+  if(ch == '\n'){
+    c = SDL_SCANCODE_RETURN;
+  }else if(ch == ' '){
+    c = SDL_SCANCODE_SPACE;
+  }else{
+    c = SDL_GetScancodeFromName(k);
+  }
+  if(c == SDL_SCANCODE_UNKNOWN || c >= 512){
+    fprintf(stderr,"Bad key '%s' - can't find SDL scancode\n", k);
+    return;
+  }
+  put_rx_ring(active_console, map[c]);
+  put_rx_ring(active_console, 0x80 | 0x40); // key down
+  put_rx_ring(active_console, map[c]);
+  put_rx_ring(active_console, 0x80);        // key up
+}
+
+// Autostart (-a): type "newboot -a" at the SDU monitor prompt.
+// The SDU monitor drops or garbles keys typed before its prompt appears (about
+// 2 emulated seconds after power-up), so wait 5 emulated seconds, then type one
+// key per tenth of an emulated second, as a person would.
+static const char *autostart_text = NULL;
+static void autostart_poll(uint64_t emu_tenths){
+  if(autostart_text == NULL || emu_tenths < 50){ return; }
+  kbd_simulate_char(*autostart_text++);
+  if(*autostart_text == 0){ autostart_text = NULL; }
 }
 
 void sdl_system_shutdown_request(void){
@@ -1448,7 +1484,7 @@ void hw_init(){
 
 void lambda_dump(int opts){
   FILE *output;
-  char ofn[32];
+  char ofn[PATH_MAX];
   uint32_t addr=0;
   int x=0;
 
@@ -2319,26 +2355,30 @@ void parse_config_line(char *line){
   if(tok[0] == '#' || tok[0] == ';'){ return; } // Comment
   if(strcasecmp(tok,"ether_addr") == 0){
     // 3Com Ethernet address
-    int x = 0;
     extern unsigned char ether_addr[6];
-    while(x < 6){
-      long int val = 0;
-      tok = strtok(NULL," :\t\r\n");
-      if(tok != NULL){
-	val = strtol(tok,NULL,16);
+    extern char ether_iface[IFNAMSIZ];
+    tok = strtok(NULL," \t\r\n");
+    if (tok != NULL) {
+      if (strcasecmp(tok,"laa") == 0) {
+	make_locally_administered_address_for_interface(ether_iface, ether_addr);
+      } else if (sscanf(tok,"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", 
+			&ether_addr[0],&ether_addr[1],&ether_addr[2],&ether_addr[3],&ether_addr[4],&ether_addr[5]) 
+		 // try to parse an explicit address
+		 != 6) {
+	// fail, so complain
+	logmsgf(LT_3COM,0,"network address: could not parse value '%s'\n", tok);
+	return;
       }
-      ether_addr[x] = val;
-      x++;
     }
     printf("Using 3Com Ethernet address %.2X:%.2X:%.2X:%.2X:%.2X:%.2X\n",
 	   ether_addr[0],ether_addr[1],ether_addr[2],ether_addr[3],ether_addr[4],ether_addr[5]);
   }
   if(strcasecmp(tok,"ether_iface") == 0){
-    extern char ether_iface[30];
+    extern char ether_iface[IFNAMSIZ];
     // 3Com Ethernet interface
     tok = strtok(NULL," \t\r\n");
     if(tok != NULL){
-      strncpy(ether_iface,tok,30);
+      snprintf(ether_iface,sizeof(ether_iface),"%s",tok);
       printf("Using 3Com Ethernet interface %s\n",ether_iface);
     }
   }
@@ -2362,8 +2402,8 @@ void parse_config_line(char *line){
       dsk = val;
       tok = strtok(NULL," \t\r\n");
       if(tok != NULL){
-	extern char disk_fn[4][64];
-	strncpy(disk_fn[dsk],tok,64);
+	extern char disk_fn[4][PATH_MAX];
+	strncpy(disk_fn[dsk],tok,PATH_MAX);
 	printf("Using disk image %s for unit %d\n",tok,dsk);
       }
     }    
@@ -2411,7 +2451,7 @@ void parse_config_line(char *line){
     // Debug Target Hostname
     tok = strtok(NULL," \t\r\n");
     if(tok != NULL){
-      strncpy(debug_target_host,tok,128);
+      strncpy(debug_target_host,tok,sizeof(debug_target_host));
       printf("Using Debug Target Hostname %s\n",debug_target_host);
     }    
   }
@@ -2745,7 +2785,7 @@ int yaml_lam_mapping_loop(yaml_parser_t *parser){
 	}
 #ifdef CONFIG_PHYSKBD
 	if(strcmp(key,"kb_file") == 0){
-	  strncpy(kbd_filename,value,128);
+	  strncpy(kbd_filename,value,sizeof(kbd_filename));
 	  printf("Using physical keyboard at %s\n",kbd_filename);
 	  goto value_done;
 	}
@@ -2798,7 +2838,7 @@ int yaml_lam_mapping_loop(yaml_parser_t *parser){
 #endif
 #ifdef CONFIG_PHYSMS
         if(strcmp(key,"ms_file") == 0){
-          strncpy(ms_filename,value,128);
+          strncpy(ms_filename,value,sizeof(ms_filename));
           printf("Using physical mouse at %s\n",ms_filename);
           goto value_done;
         }
@@ -2921,9 +2961,9 @@ int yaml_keyboard_sequence_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
 	// printf("keyboard: key %s = value %s\n",key,value);
         if(strcmp(key,"sdl") == 0){
 	  sval = atoi(value);
@@ -3029,9 +3069,9 @@ int yaml_keyboard_mapping_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
 	// printf("keyboard: key %s = value %s\n",key,value);
 	// Handle it
 	if(strcmp(key,"quit") == 0){
@@ -3172,9 +3212,9 @@ int yaml_video_mapping_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
 	if (strcmp(key,"height") == 0) {
 	  int sval = atoi(value);
 	  // 800 is standard, up to 1024 works (without microcode changes)
@@ -3273,14 +3313,16 @@ int yaml_audio_mapping_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
 	if(strcmp(key,"volume") == 0){
+#ifdef XBEEP
 	  if ((sscanf(value,"%f", &xbeep_volume) != 1) || (xbeep_volume > 1.0f) || (xbeep_volume < 0.0f)) {
 	    printf("Bad audio volume \"%s\"\n", value);
 	    xbeep_volume = 1.0f;
 	  }
+#endif
 	} else {
 	  printf("audio: Unknown key %s (value %s)\n",key,value);
 	  return(-1);
@@ -3356,9 +3398,9 @@ int yaml_mouse_sequence_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
         if(strcmp(key,"lambda") == 0){
 	  lambda = atoi(value);
 	  goto value_done;
@@ -3448,9 +3490,9 @@ int yaml_mouse_mapping_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
 	if(strcmp(key,"mode") == 0){
 	  int val = atoi(value);
 	  switch(val){
@@ -3532,10 +3574,10 @@ int yaml_log_mapping_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
 	int x=0;
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
 	// Do we know what this is?
 	if(strcasecmp(key,"ALL") == 0){
 	  int val = atoi(value);
@@ -3576,7 +3618,7 @@ int yaml_event_loop(yaml_parser_t *parser){
   int config_done = 0;
   int rv = 0;
   // Initialize
-  strncpy(key,"root",128);
+  strncpy(key,"root",sizeof(key));
   // Parse
   while(config_done == 0){
     if(!yaml_parser_parse(parser, &event)){
@@ -3624,7 +3666,7 @@ int yaml_event_loop(yaml_parser_t *parser){
       return(-1);
     seq_done:
       if(rv < 0){ return(rv); }
-      strncpy(key,"root",128);      
+      strncpy(key,"root",sizeof(key));      
       break;
     case YAML_SEQUENCE_END_EVENT:
       // printf("[End Sequence]\n");
@@ -3676,7 +3718,7 @@ int yaml_event_loop(yaml_parser_t *parser){
       return(-1);
     map_done:
       if(rv < 0){ return(rv); }      
-      strncpy(key,"root",128);      
+      strncpy(key,"root",sizeof(key));      
       break;
     case YAML_MAPPING_END_EVENT:
       // printf("[End Mapping]\n");
@@ -3693,7 +3735,7 @@ int yaml_event_loop(yaml_parser_t *parser){
 	printf("Unexpected value at root: %s\n", event.data.scalar.value);
 	return(-1);
       }
-      strncpy(key,(const char *)event.data.scalar.value,128);      
+      strncpy(key,(const char *)event.data.scalar.value,sizeof(key));      
       break;
     }
     yaml_event_delete(&event);
@@ -3796,8 +3838,89 @@ void nubus_cycle(int sdu){
   icount++; // Main cycle
 }
 
+// Support for Locally Administered Addresses for ethernet interfaces,
+// to avoid collisions (and manual config) when running more than one
+// lam process per network.
+// See https://www.why-did-it.fail/blog/old-04-mac-address-space/ and IEEE documents linked from there.
+static int
+get_laa_for_ifname(char *ifname, u_char *ea)
+{
+  FILE *f;
+  char fname[PATH_MAX];
+  sprintf(fname,"%s.LAA", ifname);
+  if ((f = fopen(fname,"r")) != NULL) {
+    if (fscanf(f, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ea[0],&ea[1],&ea[2],&ea[3],&ea[4],&ea[5]) == 6) {
+      logmsgf(LT_3COM, 1, "network: read persistent LAA from %s\n", fname);
+      fclose(f);
+      return 1;
+    } else {
+      logmsgf(LT_3COM,0,"network: file %s corrupt, deleting and ignoring it\n", fname);
+      fclose(f);
+      if (unlink(fname) < 0) {
+	logmsgf(LT_3COM,0,"network: failed to unlink %s: %s\n", fname, strerror(errno));
+      }
+      return 0;
+    }
+  } else {
+    logmsgf(LT_3COM, 1, "network: no persistent LAA file found for %s\n", ifname);
+    return 0;
+  }
+}
+
+static int
+save_laa_for_ifname(char *ifname, u_char *ea)
+{
+  FILE *f;
+  char fname[PATH_MAX];
+  sprintf(fname,"%s.LAA", ifname);
+  if ((f = fopen(fname,"w")) != NULL) {
+    if (fprintf(f, "%02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX\n", ea[0],ea[1],ea[2],ea[3],ea[4],ea[5]) > 0) {
+      logmsgf(LT_3COM, 1, "network: wrote persistent LAA to %s\n", fname);
+      fclose(f);
+      return 1;
+    } else {
+      logmsgf(LT_3COM, 0, "network: failed to write persistent LAA to %s: %s\n", fname, strerror(errno));
+      fclose(f);
+      return 0;
+    }
+  } else {
+    logmsgf(LT_3COM, 1, "network: cannot save persistent LAA to file %s: %s\n", fname, strerror(errno));
+    return 0;
+  }
+}
+
+void
+make_locally_administered_address_for_interface(char *iface, u_char *ea)
+{
+  int x;
+  u_char *oea = ea;
+
+  // first check if we have a persistent address already for ether_iface
+  if (get_laa_for_ifname(iface, ea) == 0) {
+    // We have no persistent address for that interface, so generate one.
+
+    // generate a Locally Administered Address (LAA, see https://www.why-did-it.fail/blog/old-04-mac-address-space/)
+    // These are z2::, z6::, zA::, zE::
+    // but some of them are actually allocated historically, so pick some free ones.
+    // The probabilities of getting a duplicate on a network are approx 1/2^44.
+    unsigned long long a = (u_long)random() | ((u_long)random()<<32);
+    *ea = a & 0xf0;
+    // generate a zE:: address except if we got z==2, then make a z6:: address
+    // because one address in 2E:: is taken, and one in 56::
+    if (*ea == 0x20) *ea |= 6;
+    else *ea |= 0xe;
+    for (x = 1; x < 6; x++) {
+      *++ea = (a >> x*8) & 0xff;
+    }
+
+    // then save it persistently, for ether_iface
+    save_laa_for_ifname(iface, oea);
+  }
+}
+
 // Main
 int main(int argc, char *argv[]){
+  int autostart = 0;
 #ifndef HAVE_YAML_H
   FILE *config;
 #endif
@@ -3818,6 +3941,13 @@ int main(int argc, char *argv[]){
     }
   }
   
+  // Seed random(), used to make a Locally Administered Address (address: LAA)
+#if __APPLE__
+  srandomdev();
+#else
+  srandom(time(NULL));
+#endif
+
   // Read default keymap
 
   init_sdl_to_scancode_map();
@@ -3831,7 +3961,7 @@ int main(int argc, char *argv[]){
     while(!feof(config)){
       char buf[128];
       char *ret = NULL;
-      ret = fgets(buf,128,config);
+      ret = fgets(buf,sizeof(buf),config);
       if(ret != NULL){
 	parse_config_line(buf);
       }
@@ -3843,11 +3973,12 @@ int main(int argc, char *argv[]){
   // Obtain site-wide YAML
 #ifdef SYSCONFDIR
   {
-    char sysconf[128];
-    sysconf[0] = 0;
-    strncat(sysconf,STR(SYSCONFDIR),127);
-    strncat(sysconf,"/lam.yml",127);
-    try_yaml_file(sysconf);
+    char sysconf[PATH_MAX];
+    if (strlen(STR(SYSCONFDIR)) < sizeof(sysconf)-9) {
+      sprintf(sysconf, "%s/lam.yml", STR(SYSCONFDIR));
+      try_yaml_file(sysconf);
+    } else
+      fprintf(stderr,"SYSCONFDIR too long: %s\n", STR(SYSCONFDIR));
   }
 #endif
   // Try user's home directory
@@ -3856,11 +3987,12 @@ int main(int argc, char *argv[]){
     char *homedir = getenv("HOME");
     if(homedir != NULL){
       // Use given home directory
-      char usrconf[128];
-      usrconf[0] = 0;
-      strncat(usrconf,homedir,127);
-      strncat(usrconf,"/lam.yml",127);
-      try_yaml_file(usrconf);            
+      char usrconf[PATH_MAX];
+      if (strlen(homedir) < sizeof(usrconf)-9) {
+	sprintf(usrconf,"%s/lam.yml", homedir);
+	try_yaml_file(usrconf);            
+      } else
+	fprintf(stderr,"env HOME too long: %s\n", homedir);
     }else{
       // Otherwise determine from UID
       uid_t user_id = getuid();
@@ -3877,11 +4009,12 @@ int main(int argc, char *argv[]){
       // printf("UID: %d\n",user_id);
       pw = getpwuid(user_id);
       if(pw != NULL){
-	char usrconf[128];
-	usrconf[0] = 0;
-	strncat(usrconf,pw->pw_dir,127);
-	strncat(usrconf,"/lam.yml",127);
-	try_yaml_file(usrconf);      
+	char usrconf[PATH_MAX];
+	if (strlen(pw->pw_dir) < sizeof(usrconf)-9) {
+	  sprintf(usrconf,"%s/lam.yml", pw->pw_dir);
+	  try_yaml_file(usrconf);      
+	} else 
+	  fprintf(stderr,"homedir too long: %s\n", pw->pw_dir);
       }	     
     }
   }
@@ -3893,7 +4026,12 @@ int main(int argc, char *argv[]){
   if(argc > 1){
     int x = 1;
     while(x < argc){
-      
+
+      if (strcmp("-a",argv[x]) == 0) {
+	autostart = 1;
+	printf("Autostart enabled\n");
+      }
+
 #ifdef BURR_BROWN
       if(strcmp("-d",argv[x]) == 0){
 	debug_target_mode = 10;
@@ -3945,6 +4083,7 @@ int main(int argc, char *argv[]){
       if(strcmp("-?",argv[x]) == 0){
         printf("\nUsage: lam [OPTIONS]\n");
         printf("Valid options:\n");
+	printf("  -a                  Boot automatically (types \"newboot -a\" to the SDU)\n");
 	printf("  -t                  Throttle to the speed of a real Lambda\n");
 #ifdef HAVE_YAML_H
 	printf("  -c FILE             Read YAML configuration FILE\n");
@@ -4018,6 +4157,8 @@ int main(int argc, char *argv[]){
       sdu_cons_clockpulse();
       usleep(0);
     }
+  }else if(autostart){
+    autostart_text = "newboot -a\n";
   }
 
   host_now_us = host_us();
@@ -4159,6 +4300,7 @@ int main(int argc, char *argv[]){
     }
     // Emulated time passed
     emu_time++;
+    autostart_poll(emu_time);
     // Timer won't wrap for many years, so we don't have to care about that
     // Are we ahead of real time? (Only a throttled emulator waits for it.)
     if(throttle && emu_time > real_time){

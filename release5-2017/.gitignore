@@ -1,0 +1,5 @@
+# Files created by running the emulator in this directory
+/disks/
+/CMOS.RAM
+/RTC.RAM
+/lam.yml

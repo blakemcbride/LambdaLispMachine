@@ -1,0 +1,24 @@
+LAMBDA SOFTWARE RELEASE 5.0
+
+       			   !! IMPORTANT NOTE !!
+
+  THIS RELEASE IS NOT AUTHORIZED OR ENDORSED BY EITHER GIGAMOS SYSTEMS
+  INCORPORATED OR LISP MACHINES INCORPORATED.
+
+  USE AT YOUR OWN RISK. NO LICENSE IS EXPRESSED OR IMPLIED.
+
+      	                   --------------------
+
+  The last official release of the Lambda software was Release 4.0. This
+  release was created to address deficiencies in the final 4.0 release.
+
+  This release is EXPERIMENTAL. Bug reports may be made to the LispM list as
+  described in the LambdaDelta README. Patches or updates will be released as
+  they are available. No warranty is expressed or implied. 
+
+  The kit consists of three tapes: An install tape, a system sources tape,
+  and an options kit tape. The install tape can be installed as described
+  in the LambdaDelta README. The system sources tape is meant to be restored
+  using the Backup activity's Restore option. The options kit tape is meant
+  to be restoring usng the Backup activity's Install Distribution option.
+

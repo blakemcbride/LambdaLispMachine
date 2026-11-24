@@ -57,3 +57,5 @@ configure~
 lam.out
 tools/.deps/
 tools/lmfuse/.deps/
+# Locally administered Ethernet addresses (ether_addr laa)
+*.LAA

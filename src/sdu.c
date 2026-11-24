@@ -3195,9 +3195,9 @@ int yaml_sdu_mapping_loop(yaml_parser_t *parser){
       break;
     case YAML_SCALAR_EVENT:
       if(key[0] == 0){
-	strncpy(key,(const char *)event.data.scalar.value,128);
+	strncpy(key,(const char *)event.data.scalar.value,sizeof(key));
       }else{
-	strncpy(value,(const char *)event.data.scalar.value,128);
+	strncpy(value,(const char *)event.data.scalar.value,sizeof(value));
 	if(strcmp(key,"switch") == 0){
 	  int val = atoi(value);
 	  extern uint8_t sdu_rotary_switch;

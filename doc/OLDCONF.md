@@ -23,6 +23,12 @@
   LAN, so do not make it the same as the host! It is written in the
   canonical colon-separated hex format.
   The default is 00:02:9C:55:89:C6.
+  Instead of an address, MAC-ADDRESS may be "laa". The emulator then makes
+  up a random Locally Administered Address the first time and saves it in
+  the file IFACE.LAA (for example ldtap.LAA) in the working directory,
+  using it from then on. This avoids collisions when several emulators
+  share a network. Put the ether_iface line before this one, since the
+  file is named after the interface.
 
   disk N FNAME
 

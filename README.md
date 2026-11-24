@@ -3,10 +3,12 @@
 This is a maintained fork of Daniel Seagraves' LambdaDelta
 (https://github.com/dseagrav/ld), which its author placed on indefinite
 hiatus in December 2020. The fork builds with current compilers and uses
-SDL3.
+SDL3. It also carries the emulator fixes from the tumbleweed.nu fork
+(https://tumbleweed.nu/r/ld/), including two upstream pull requests by
+Björn Victor that were never merged.
 
 This repository is self-contained: besides the emulator source it holds the
-ROM images, tape images, an already-installed disk image, the surviving LMI
+ROM images, tape images, already-installed disk images, the surviving LMI
 software archives and the LMI documentation. See
 [Quick Start](#quick-start) and [What Is In This Repository](#what-is-in-this-repository).
 
@@ -17,6 +19,9 @@ software archives and the LMI documentation. See
     - [About the Lambda](#about-the-lambda)
     - [Contact](#contact)
 - [Quick Start](#quick-start)
+    - [A Ready-Made Machine](#a-ready-made-machine)
+    - [Bogodyne ZetaLisp](#bogodyne-zetalisp)
+    - [The 2017 Release 5.0 Kit](#the-2017-release-50-kit)
 - [What Is In This Repository](#what-is-in-this-repository)
 - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
@@ -24,9 +29,11 @@ software archives and the LMI documentation. See
 - [Configuring LambdaDelta](#configuring-lambdadelta)
 - [Using LambdaDelta](#using-lambdadelta)
     - [Exiting](#exiting)
+    - [Network](#network)
     - [Preparing ROM Images](#preparing-rom-images)
     - [Microcode Symbol Files](#microcode-symbol-files)
     - [Installing a New Machine](#installing-a-new-machine)
+- [Working With the Lisp System](#working-with-the-lisp-system)
 
 <!-- markdown-toc end -->
 # LAMBDADELTA
@@ -85,6 +92,12 @@ See http://lists.tunes.org/mailman/listinfo/lispm/ for more information.
 
 All contributors to this project are listed in the AUTHORS file.
 
+Related projects: the tumbleweed.nu LambdaDelta fork
+(https://tumbleweed.nu/r/ld/), maintained by Alfred M. Szmidt, and Björn
+Victor's chaosnet-bridge (https://github.com/bictorv/chaosnet-bridge),
+which links Chaosnet hosts, including emulated Lisp Machines, over the
+Internet.
+
 # Quick Start
 
 This brings up a Lisp Listener using the included, already-installed disk
@@ -106,16 +119,41 @@ If LambdaDelta was built with libyaml it reads `lam.yml` instead of
       switch: 1
 
 A window opens showing the SDU monitor prompt (`>>`). Type `newboot` and
-press enter, and at the `Command:` prompt type `boot`. Lisp takes about 20
+press enter, and at the `Command:` prompt type `boot`. Or start the
+emulator as `src/lam -a`, which types `newboot -a` for you, so Lisp boots
+with no typing. Lisp takes about 20
 seconds to start on a current PC (about a minute at the speed of a real
 Lambda; see [Using LambdaDelta](#using-lambdadelta)). From there, continue at step 21 of
 [Installing a New Machine](#installing-a-new-machine) to name the machine,
 create its file system and restore the system sources from
-`tapes/02_system.tap`.
+`tapes/02_system.tap`, or use the ready-made machine below, where that has
+been done.
 
 Ethernet needs a tuntap interface and the privilege to open it. Without
 that LambdaDelta prints `ether_init(): Operation not permitted` and runs
-without a network.
+without a network. See [Network](#network).
+
+## A Ready-Made Machine
+
+`installed/lama` holds a Release 5.0 machine that is fully set up. It is
+the host LAMBDA-A (LAMA), its file system holds the system sources and
+compiled files, and its current band, LOD2, has the patches loaded
+(System 130.12). From the top of the tree:
+
+    mkdir -p disks
+    xz -dc installed/lama/disk.img.xz > disks/disk.img
+    cp installed/lama/CMOS.RAM installed/lama/RTC.RAM installed/ulambda.lmc-sym .
+    cp examples/ld.conf ld.conf
+    src/lam -a
+
+It comes from the tumbleweed.nu fork (`LAMA-disk.img.xz` and
+`LAMA-CMOS.RAM` at https://tumbleweed.nu/r/ld/uvlist). That image's SDU
+configuration had been made by another build of the emulator and expected a
+board in slot 12, so newboot stopped with `Got timeout initializing board
+in slot 12`. The SDU `config` command was run on it once, rewriting the
+three disk blocks of the SDU's configuration file; nothing else differs
+from the original, whose SHA3-256 is
+`206b4b9986c72aaa74324e88ebaee326fed119e6ebce6bd5010605c34b5c1f94`.
 
 ## Bogodyne ZetaLisp
 
@@ -160,23 +198,70 @@ sets was read before the warning, so it is behind by however long the
 warning waited; boot again to get the right time.
 `zetalisp/installed/RTC.RAM` already holds Central.
 
+## The 2017 Release 5.0 Kit
+
+`release5-2017` holds the Lambda Software Release 5.0 kit that Daniel
+Seagraves put together in 2017 to fix problems in the last official
+release, 4.0 (`Lambda-Release5.tar.gz`, from
+https://tumbleweed.nu/r/attic/sys130/uv/). Its notice,
+`release5-2017/README.Release5`, says that the release is experimental,
+that it is not authorized or endorsed by GigaMos Systems or Lisp Machines
+Incorporated, and that no license is expressed or implied. It has three
+tapes, in `release5-2017/tapes`:
+
+- `01_install.tap`: the SDU software, microcode 1764 and a System 131.1
+  band, a later build than the top-level `00_install.tap` (microcode 1762,
+  System 130.0). `install` loads all of it in one pass, into LMC1, LMC2,
+  LOD1 and LOD3, so `read-tape` is not needed.
+- `02_system.tap`: the system sources, a backup tape to restore with the
+  Backup activity's Restore option.
+- `03_options.tap`: the options kit, to load with the Backup activity's
+  Install Distribution option. Its directories are GATEWAY (with
+  GATEWAY;DATABASE), FONTS, DEMO, HARDCOPY;TIGER, EXAMPLES,
+  WINDOW;WINDOW-MAKER, WINDOW;FONT-EDITOR, VIDEO-DEVICE;GREY, OBJECTLISP,
+  NETWORK;KERMIT, NETWORK;EDIT and CUSTOMER-SITE. Bitsavers does not have
+  this tape.
+
+The directory is a LambdaDelta working directory (its `roms` is a link to
+the top-level one), and `release5-2017/installed` was made by installing
+`01_install.tap` through step 17 of
+[Installing a New Machine](#installing-a-new-machine). After building
+LambdaDelta:
+
+    cd release5-2017
+    mkdir -p disks
+    xz -dc installed/disk.img.xz > disks/disk.img
+    cp installed/CMOS.RAM installed/RTC.RAM .
+    cp ../examples/ld.conf ld.conf
+    ../src/lam -a
+
+Then continue at step 21 of the installation procedure, restoring
+`02_system.tap` and then installing `03_options.tap` (F12 changes tapes).
+`release5-2017/ulambda.lmc-sym` is the ZetaLisp one: the two releases'
+microcode 1764 is the same apart from the tape header.
+
 # What Is In This Repository
 
 | Path        | Contents |
 |-------------|----------|
 | `src`       | The emulator (`lam`) and the partition tool `lpart`. |
-| `tools`     | Tape and disk image utilities, and `lmfuse`, a FUSE view of an LMFS file system. |
+| `tools`     | Tape and disk image utilities, `lmfuse`, a FUSE view of an LMFS file system, and `lmftpput.sh`, which copies a directory tree to a Lisp Machine by FTP (see [Network](#network)). |
 | `roms`      | The three ROM images the emulator loads, under the names it expects. |
 | `firmware`  | The original Bitsavers firmware archives the ROM images came from, along with the PAL and PROM dumps for the other boards. |
 | `tapes`     | Tape images. `00_install.tap` is the installation tape and `02_system.tap` is a Lisp backup tape of the system sources. The others are LMI Unix boot and distribution tapes and two unidentified tapes. |
-| `installed` | A disk image (compressed) and matching CMOS/RTC contents produced by running the installation procedure below through step 17, and the symbol file for its microcode (version 1762), which the emulator needs in order to make Lisp's beep audible. |
-| `software`  | Archives of Lambda file systems (`dj_full.tgz`, `jb_full.tgz`) and the K-Machine software (`k_machine.tgz`). These hold the Lisp system sources as ordinary files. |
-| `doc`       | `KEYCODES` and `OLDCONF.md` for the emulator, and in `doc/lmi` the LMI manuals (Lisp, editors, hardware, Unix, release notes), the field service manual, SDU description, K-Machine material and board photographs. `doc/lmi/tapes.txt` describes the two main tapes. |
+| `installed` | A disk image (compressed) and matching CMOS/RTC contents produced by running the installation procedure below through step 17, and the symbol file for its microcode (version 1762), which the emulator needs in order to make Lisp's beep audible. `installed/lama` is a fully set-up machine; see [A Ready-Made Machine](#a-ready-made-machine). |
+| `software`  | Archives of Lambda file systems (`dj_full.tgz`, `jb_full.tgz`) and the K-Machine software (`k_machine.tgz`). These hold the Lisp system sources as ordinary files. `software/zeta-c` is Scott Burson's Zeta-C, a C compiler for Lisp Machines that he placed in the public domain in 2003. Its sources have LMI conditionals, but this copy's system definition is the Symbolics Genera 7 one, so building it on the Lambda will need some porting; it has not been tried. |
+| `doc`       | `KEYCODES` and `OLDCONF.md` for the emulator, and in `doc/lmi` the LMI manuals (Lisp, editors, hardware, Unix, release notes), the field service manual, SDU description, K-Machine material and board photographs. `doc/lmi/tapes.txt` describes the two main tapes. `doc/hardware` has the specifications of hardware the emulator models: TI's 1983 NuBus specification, the Ciprico Tapemaster product specification and application note, and the Interphase SMD 2180 disk controller manual. `doc/mit-lisp-machine-manual` is the MIT Lisp Machine Manual, 6th edition (1984), one PDF per chapter. It stands in for volume 1 of LMI's Lisp manual, which Bitsavers does not have; most of it applies to Lambda Lisp. |
 | `examples`  | Sample configuration files. |
 | `zetalisp`  | Bogodyne ZetaLisp System 500.0 Release 1, with an installed disk image; see [Bogodyne ZetaLisp](#bogodyne-zetalisp). |
+| `release5-2017` | The 2017 Lambda Release 5.0 kit (install, system and options tapes), with an installed disk image; see [The 2017 Release 5.0 Kit](#the-2017-release-50-kit). |
 
 The ROM, tape, software and documentation files came from Bitsavers
-(http://www.bitsavers.org/), directories `pdf/lmi` and `bits/LMI`.
+(http://www.bitsavers.org/): directories `pdf/lmi` and `bits/LMI`, and for
+`doc/hardware`, `doc/mit-lisp-machine-manual` and `software/zeta-c`,
+`pdf/ti/nubus`, `pdf/ciprico/tapemaster`, `pdf/interphase/SMD_2180`,
+`pdf/mit/cadr/chinual_6thEd_Jan84` and `bits/TI/Explorer/zeta-c`.
+`release5-2017` and `installed/lama` came from tumbleweed.nu.
 
 # Getting Started
 
@@ -268,6 +353,11 @@ host's clock in this mode,
 so time in Lisp passes at the right rate. To run at the 5 MHz of a real
 Lambda instead, start the emulator with `-t`, or set `throttle on` in
 `ld.conf` (`throttle: on` in the `lam` section of `lam.yml`).
+
+Start the emulator with `-a` to boot Lisp with no typing. Five emulated
+seconds after starting, once the SDU monitor's prompt is up, it types
+`newboot -a`, which boots the current band. (The SDU drops keys typed
+before its prompt appears.) `-a` does nothing when the SDU switch is 0.
 
 While the program is running, the window title bar has the following form:
 
@@ -398,6 +488,52 @@ booted again. To keep it, save the world to a spare band after defining it
 and make that band the one that boots, for example
 `(si:disk-save "LOD2")` and then `(si:set-current-band "LOD2")`.
 
+## Network
+
+The Lambda's 3Com Ethernet board is connected to a host tap interface,
+`ldtap` by default. On Linux, create it once, owned by the user who runs
+the emulator, and give the host an address on its network:
+
+    sudo ip tuntap add ldtap mode tap user $USER
+    sudo ip link set ldtap up
+    sudo ip addr add 10.0.0.1/24 dev ldtap
+
+The Lambda's MAC address is set by `ether_addr` in `ld.conf` (`address`
+in the `network` section of `lam.yml`). Each Lambda on a network needs its
+own. If you run more than one emulator, set it to `laa` instead of an
+address: the emulator then makes up a random locally administered address
+the first time, saves it in `IFACE.LAA` (for example `ldtap.LAA`) in the
+working directory, and uses that from then on. Give the interface before
+the address in the configuration file, since the file is named after it.
+
+Lisp also has to know its address. For Release 5, see that
+`SYS: SITE; SITE.LISP` has a network entry like
+
+    (:NETWORK-NAMES '((("CUSTOMER-NETWORK")
+                       ((:INTERNET "10.0.0.0" "255.255.255.0")
+                        (:CHAOS 7)))))
+    (:DEFAULT-INTERNET-ROUTING "10.0.0.1")
+
+and that `SYS: SITE; HOSTS.TEXT` names the host and the Lambda:
+
+    HOST LAMBDA-HOST,  [INTERNET 10.0.0.1],USER,UNIX,VAX
+    HOST LAMBDA-A,     [INTERNET 10.0.0.2, CHAOS 3430],USER,LISPM,LISPM,[LAM-A,LAMA]
+
+replacing the addresses as needed. Then recompile the site files and
+reconfigure the network, and save the world with `disk-save` to keep the
+change:
+
+    (make-system 'site :recompile)
+    (network:configure)
+
+With the network up, `tools/lmftpput.sh DIR` writes an `expect` script
+that copies every file under `DIR` to the Lisp Machine by FTP, making the
+directories as it goes; pipe it to `expect -`. Edit `HOST` and `LM` at the
+top of the script to the Lambda's IP address and host name first.
+
+To reach other Lisp Machines over the Internet by Chaosnet, see
+chaosnet-bridge (https://github.com/bictorv/chaosnet-bridge).
+
 ## Preparing ROM Images
 
 The ROM images go in the "roms" subdirectory, and are already there in this
@@ -521,3 +657,92 @@ At this point you can follow the instructions included with the
 distribution tape. If it is a backup tape, simply restore it. If it is
 an actual distribution tape, it may have special loading procedures.
 The included `02_system.tap` is a backup tape.
+
+# Working With the Lisp System
+
+These notes come from the tumbleweed.nu fork's README. They apply to the
+Release 5 system with its sources restored.
+
+## (Re)Compiling the Whole System
+
+To compile the files of the system that need it, evaluate
+
+    (make-system 'system)
+
+After many changes it may be worth recompiling everything:
+
+    (make-system 'system ':recompile)
+
+## Assembling the Microcode
+
+To assemble a new microcode load, evaluate
+
+    (load "sys:ulambda;ucode")
+    (make-system 'ucode)
+
+With the Bitsavers system tape, `SYS: ULAMBDA; UC-LAMBDA-ARRAY.LISP`
+fails to compile; open the file and save it without changes, then try
+again.
+
+To load the result (the latest `SYS: UBIN; ULAMBDA LMC`) into a microcode
+partition, evaluate
+
+    (si:load-lmc-file t 2) ; Or another suitable partition.
+
+To test it, press F11 to return to Newboot, use the `set-uload` command at
+the `Command:` prompt to pick the new microcode for this boot, and then
+`boot`. To make it the default, evaluate `(set-current-microload "LMC2")`.
+
+## Generating a New Cold Load Band
+
+To load the cold load generator and build a cold load band, evaluate
+
+    (make-system 'cold)
+    (cold:make-cold 2) ; Or another suitable partition.
+
+This takes about 20 minutes on a current PC. Booting the band needs the
+MINI server, so in a 2x2 configuration start it on the first processor
+(System-7, F1 then 7, and in the right pane evaluate
+`(mini-server-process)`), switch to the second with F9 and evaluate
+`(disk-restore 2)`. When the cold load band has booted, evaluate
+`(si:qld)` to load the rest of the system. When the new system works,
+make it the default band with `(set-current-band "LOD2")`.
+
+## Making Distribution Tapes
+
+A distribution is two tapes: the install tape (installation software,
+microcode and load band) and a backup tape of the SYS tree. To make one,
+load `SYS: RELEASE; MAKE-TAPE.LISP` and `SYS: RELEASE; DEFTAPES.LISP`,
+then evaluate `(SET-RELEASE)` and `(MAKE-PRODUCT-TAPE)` and choose the
+kind of tape. `tools/dumptape` splits a tape image into its files; on the
+install tape these are:
+
+| File         | Contents |
+|--------------|----------|
+| `file-0.dat` | Tape header |
+| `file-1.dat` | A tar archive of the SDU installation programs (`setup`, `load` and others) |
+| `file-2.dat` | The UNX6 partition (SDU file system) |
+| `file-3.dat` | LMC1 (Lambda microcode) |
+| `file-4.dat` | LMC2 (Lambda microcode) |
+| `file-5.dat` | LOD1 (Lisp load band) |
+
+## Debugging the Other Processor
+
+In a 2x2 configuration one processor can debug the other. Evaluate
+`(lam:setup)` and choose the "local" option. Then System Control-D (F1,
+then Control-D) starts the debugger; in its top pane choose `LAM for
+novice` and use the menu on the right.
+
+## Partition Names and More Disks
+
+The Lambda can use several disk units, and the names of their partitions
+matter. The first character of a partition's name must be the unit it is
+on, so a FILE partition on unit 1 has to be named 1ILE or 1FILE. The last
+character of the name of a partition holding writable data says which
+processor uses it: PAGE, METR and FILE belong to the first processor and
+PAG1, MET1 and FIL1 to the second.
+
+The real Lambda could handle only two disk units, though its controller
+supports four, as LambdaDelta does. To label a new disk, give the SDU
+commands `/tar/setup clear eagle sp shell` and `/tar/load`, and at the
+`load >` prompt `unit N`.

@@ -257,8 +257,6 @@ read_part_table(char *filename)
 
 	pe = (struct part_table_entry_s *)(&pt->pt_offset);
 	for (i = 0; i < count; i++) {
-		int user_type, property;
-
 		memcpy(part_table[index].name,
 		       pe->pte_name, 4);
 		part_table[index].name[4] = 0;
@@ -298,6 +296,11 @@ extract_part(char *partition)
 	int i, index, blocks, fd2, bpblk, ret;
 	off_t offset;
 
+	if (partition == NULL) {
+		printf("no partition specified\n");
+		return -1;
+	}
+
 	index = -1;
 	for (i = 0; i < part_table_size; i++) {
 		if (strcmp(partition, part_table[i].name) == 0) {
@@ -332,7 +335,11 @@ extract_part(char *partition)
 			break;
 		}
 
-		write(fd2, block, bpblk);
+		ret = write(fd2, block, bpblk);
+		if (ret < 0) {
+			perror("write");
+			break;
+		}
 	}
 
 	close(fd2);
@@ -343,10 +350,9 @@ extract_part(char *partition)
 int
 load_part(char *partition)
 {
-	int i, j, index, blocks, fd2, swap;
-	uint8_t sblock[E_BLKSIZE];
+	int i, index, blocks, fd2;
 	off_t offset;
-	size_t bpblk;
+	ssize_t bpblk;
 	ssize_t ret;
 
 	index = -1;
@@ -490,6 +496,7 @@ int main(int argc, char *argv[])
 	int c, need_write;
 	char *partition;
 
+	partition = NULL;
 	filename = "disk.img";
 
 	show_flag = 1;
