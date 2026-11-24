@@ -357,6 +357,7 @@ struct lambdaState {
   uint32_t disp_constant_reg;  // Dispatch constant register
   uint32_t stat_counter_main;  // Main stat counter
   uint32_t stat_counter_aux;   // Aux stat counter
+  uint64_t stat_counter_aux_us; // Host time the aux counter was last brought up to date (throttle off)
 
   /* SPY items */
   CSMAdr_Word CSM_Adr;          // For hacking (CSMRAM?), also carries memory info on read
@@ -414,6 +415,7 @@ struct lambdaState {
 
 void lambda_initialize(int I,int ID);
 void lambda_clockpulse(int I);
+void lambda_update_usec_clock(int I);
 void shadow_write(uint32_t addr,Q data);
 Q shadow_read(uint32_t addr);
 

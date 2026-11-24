@@ -79,11 +79,33 @@ void vcmem_kb_int(int vn){
 //  has last write whatsoever (except 0 and 0x70)
 unsigned char last_kbd_ctrl_write = 0;
 
+// A vertical blank has been taken; schedule the next one
+static void vcmem_blank_done(int vn){
+  if(throttle){
+    vcS[vn].cycle_count = 0;
+  }else{
+    // 60 per second of host time. Lisp's fake microsecond clock advances by
+    // 16667 on each one, so blanks missed while the host was busy are
+    // delivered late rather than dropped, unless we are over a second behind.
+    vcS[vn].next_blank_us += 16667;
+    if(vcS[vn].next_blank_us + 1000000 < host_now_us){
+      vcS[vn].next_blank_us = host_now_us + 16667;
+    }
+  }
+}
+
 void vcmem_clock_pulse(int vn){
+  int blank_due;
   // Time has passed...
-  vcS[vn].cycle_count++;
-  // There are 5000000 cycles per second, so 83335 per blank
-  if(vcS[vn].cycle_count >= 83335){
+  if(throttle){
+    vcS[vn].cycle_count++;
+    // There are 5000000 cycles per second, so 83335 per blank
+    blank_due = (vcS[vn].cycle_count >= 83335);
+  }else{
+    if(vcS[vn].next_blank_us == 0){ vcS[vn].next_blank_us = host_now_us + 16667; }
+    blank_due = (host_now_us >= vcS[vn].next_blank_us);
+  }
+  if(blank_due){
     // We should test the global enable in the function register first, but it hasn't been touched yet
     if(vcS[vn].MemoryControl.InterruptEnabled != 0){
       // Vertical Blank
@@ -91,11 +113,11 @@ void vcmem_clock_pulse(int vn){
       if(NUbus_Busy == 0){
 	// We can has bus
 	nubus_io_request(VM_WRITE,0xF4,vcS[vn].InterruptAddr,0xFFFFFFFF);
-	vcS[vn].cycle_count = 0;
+	vcmem_blank_done(vn);
 	// logmsgf(LT_VCMEM,,"VCMEM: VB Int generated\n");
       }
     }else{
-      vcS[vn].cycle_count = 0; // No interrupt, carry on
+      vcmem_blank_done(vn); // No interrupt, carry on
     }
   }
   // *** NUBUS SLAVE ***

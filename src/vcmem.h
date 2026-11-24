@@ -111,6 +111,7 @@ struct vcmemState {
   SerialControlReg SerialControl;
   // Timing
   uint32_t cycle_count;
+  uint64_t next_blank_us;   // Host time of the next vertical blank (throttle off)
   // Software state
   uint8_t Card;
 };

@@ -288,6 +288,16 @@ volatile uint64_t real_time = 0;
 volatile uint64_t emu_time = 0;
 volatile uint32_t stat_time = 20;
 
+// Speed control (see ld.h). Off by default: run as fast as the host allows.
+int throttle = 0;
+uint64_t host_now_us = 0;
+
+uint64_t host_us(void){
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return((uint64_t)ts.tv_sec*1000000 + ts.tv_nsec/1000);
+}
+
 // Framebuffer size
 #define DEFAULT_VIDEO_HEIGHT 800
 #define MAX_VIDEO_HEIGHT 1024 // BV: increase height, but won't work for more than 1024 related to address space layout
@@ -522,6 +532,10 @@ int input_fps = 83333;  // 60 FPS
 int video_fps = 500000; // 10 FPS
 int input_frame = 0;    // Frame trigger flag
 int video_frame = 0;    // Frame trigger flag
+// Frame timing when unthrottled
+uint32_t host_check = 0;     // Passes through the main loop since the host clock was read
+uint64_t next_input_us = 0;  // Host time of the next input frame
+uint64_t next_video_us = 0;  // Host time of the next video frame
 // Keyboard buffer
 uint8_t keyboard_io_ring[2][0x100];
 uint8_t keyboard_io_ring_top[2],keyboard_io_ring_bottom[2];
@@ -2518,6 +2532,22 @@ void parse_config_line(char *line){
     }
     return;
   }
+  if(strcasecmp(tok,"throttle") == 0){
+    // Run at the speed of a real Lambda (on) or as fast as the host allows (off)
+    tok = strtok(NULL," \t\r\n");
+    if(tok != NULL){
+      if((strcasecmp(tok,"on") == 0) || (strcasecmp(tok,"yes") == 0) || (strcasecmp(tok,"true") == 0)){
+        throttle = 1;
+      }else{
+	if((strcasecmp(tok,"off") == 0) || (strcasecmp(tok,"no") == 0) || (strcasecmp(tok,"false") == 0)){
+	  throttle = 0;
+	}else{
+	  printf("throttle: unrecognized value '%s' (on/true/yes, off/false/no)\n", tok);
+	}
+      }
+    }
+    return;
+  }
   if(strcasecmp(tok,"video_fps") == 0){
     // Video update rate
     tok = strtok(NULL," \t\r\n");
@@ -2697,6 +2727,19 @@ int yaml_lam_mapping_loop(yaml_parser_t *parser){
 	  if(chdir(value) != 0){
 	    perror("chdir");
 	    return(-1);
+	  }
+	  goto value_done;
+	}
+	if(strcmp(key,"throttle") == 0){
+	  if((strcasecmp(value,"on") == 0) || (strcasecmp(value,"yes") == 0) || (strcasecmp(value,"true") == 0)){
+	    throttle = 1;
+	  }else{
+	    if((strcasecmp(value,"off") == 0) || (strcasecmp(value,"no") == 0) || (strcasecmp(value,"false") == 0)){
+	      throttle = 0;
+	    }else{
+	      printf("lam: throttle: unrecognized value '%s' (expecting on/true/yes or off/false/no)\n", value);
+	      return(-1);
+	    }
 	  }
 	  goto value_done;
 	}
@@ -3717,11 +3760,14 @@ int icount=0; // Main cycle counter
 void nubus_cycle(int sdu){
   if(bcount == 5){
     // Update microsecond clock if that's enabled (NB: AUX stat only!)
-    if(pS[0].RG_Mode.Aux_Stat_Count_Control == 6){
-      pS[0].stat_counter_aux++;
-    }
-    if(pS[1].RG_Mode.Aux_Stat_Count_Control == 6){
-      pS[1].stat_counter_aux++;
+    // Unthrottled, it follows host time instead; see lambda_update_usec_clock().
+    if(throttle){
+      if(pS[0].RG_Mode.Aux_Stat_Count_Control == 6){
+	pS[0].stat_counter_aux++;
+      }
+      if(pS[1].RG_Mode.Aux_Stat_Count_Control == 6){
+	pS[1].stat_counter_aux++;
+      }
     }
     bcount = 0;
   }
@@ -3892,10 +3938,14 @@ int main(int argc, char *argv[]){
 	  exit(-1);	  
 	}
       }
-#endif      
+#endif
+      if(strcmp("-t",argv[x]) == 0){
+	throttle = 1;
+      }
       if(strcmp("-?",argv[x]) == 0){
         printf("\nUsage: lam [OPTIONS]\n");
         printf("Valid options:\n");
+	printf("  -t                  Throttle to the speed of a real Lambda\n");
 #ifdef HAVE_YAML_H
 	printf("  -c FILE             Read YAML configuration FILE\n");
 	printf("  --yaml-key VALUE    Use provided value for YAML key (see documentation)\n");
@@ -3969,7 +4019,9 @@ int main(int argc, char *argv[]){
       usleep(0);
     }
   }
-  
+
+  host_now_us = host_us();
+  printf("Speed: %s\n", throttle ? "throttled to a real Lambda's 5 MHz" : "unthrottled");
   while(ld_die_rq == 0){
     // New loop
     icount -= 500000; // Don't clobber extra cycles if they happened
@@ -3995,29 +4047,44 @@ int main(int argc, char *argv[]){
       }
       // NOTE THAT IN THE BEST CASE, ICOUNT WILL INCREMENT BY 5 HERE
       // WITH HEAVY LAMBDA/SDU INTERACTION (DISK IO!), THIS CAN BE SEVERAL MULTIPLES OF 5!
+      int input_now = 0, video_now = 0;
+      if(throttle){
+	// Input and video frames are counted in bus cycles
+	if((icount%input_fps) < 30){
+	  if(input_frame == 0){ input_now = 1; input_frame = 1; }
+	}else{
+	  input_frame = 0;
+	}
+	if((icount%video_fps) < 30){
+	  if(video_frame == 0){ video_now = 1; video_frame = 1; }
+	}else{
+	  video_frame = 0;
+	}
+      }else{
+	// Input and video frames are counted in host time. The clock is read
+	// every 1024 passes (at least 5120 bus cycles), which also refreshes
+	// host_now_us for the vertical blank timer.
+	host_check++;
+	if((host_check & 0x3FF) == 0){
+	  host_now_us = host_us();
+	  // input_fps and video_fps are bus cycles per frame, 5 to the microsecond
+	  if(host_now_us >= next_input_us){ input_now = 1; next_input_us = host_now_us + input_fps/5; }
+	  if(host_now_us >= next_video_us){ video_now = 1; next_video_us = host_now_us + video_fps/5; }
+	}
+      }
       // Clock input
-      if((icount%input_fps) < 30){
-	if(input_frame == 0){
+      if(input_now){
 #ifdef CONFIG_PHYSKBD
-	  sdu_kbd_clockpulse();
+	sdu_kbd_clockpulse();
 #endif
 #ifdef CONFIG_PHYSMS
-	  sdu_ms_clockpulse();
+	sdu_ms_clockpulse();
 #endif
-	  sdl_refresh(0);
-	  input_frame = 1;
-	}
-      }else{
-	if(input_frame == 1){ input_frame = 0; }
+	sdl_refresh(0);
       }
       // Clock video
-      if((icount%video_fps) < 30){
-	if(video_frame == 0){
-	  sdl_refresh(1);
-	  video_frame = 1;
-	}
-      }else{
-	if(video_frame == 1){ video_frame = 0; }
+      if(video_now){
+	sdl_refresh(1);
       }
     }
     // Plumb SDU serial console (should probably happen in the input frame?)
@@ -4074,7 +4141,18 @@ int main(int argc, char *argv[]){
 	sprintf(statbuf[1],"Unknown State %d",cp_state[active_console]);
 	break;
       }
-      sprintf(statbuf[2]," | DT %lld",(long long)(emu_time-real_time));
+      if(throttle){
+	sprintf(statbuf[2]," | DT %lld",(long long)(emu_time-real_time));
+      }else{
+	// Speed relative to a real Lambda since the last update
+	static uint64_t last_emu = 0, last_real = 0;
+	if(real_time > last_real){
+	  sprintf(statbuf[2]," | Speed %.1fx",(double)(emu_time-last_emu)/(double)(real_time-last_real));
+	}else{
+	  statbuf[2][0] = 0;
+	}
+	last_emu = emu_time; last_real = real_time;
+      }
       sprintf(titlebuf,"%s%s%s",statbuf[0],statbuf[1],statbuf[2]);
       SDL_SetWindowTitle(SDLWindow, titlebuf);
       stat_time = 0;
@@ -4082,8 +4160,8 @@ int main(int argc, char *argv[]){
     // Emulated time passed
     emu_time++;
     // Timer won't wrap for many years, so we don't have to care about that
-    // Are we ahead of real time?
-    if(emu_time > real_time){
+    // Are we ahead of real time? (Only a throttled emulator waits for it.)
+    if(throttle && emu_time > real_time){
       // Yes, wait.
       while(emu_time > real_time){
 	usleep(0); // Allow real time to pass

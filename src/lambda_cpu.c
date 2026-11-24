@@ -1405,6 +1405,7 @@ void handle_source(int I,int source_mode){
       }
       break;
     case 0142: // LAM-M-SRC-STAT-COUNTER-AUX
+      if(!throttle){ lambda_update_usec_clock(I); }
       pS[I].Mbus = pS[I].stat_counter_aux;
       break;
     case 0144: // LAM-M-SRC-MACRO-IR-DECODE-MISC-ENABLE
@@ -1579,6 +1580,7 @@ void handle_destination(int I){
 	break;
       case 004: // LAM-FUNC-DEST-STAT-COUNTER-AUX
 	pS[I].stat_counter_aux = pS[I].Obus;
+	if(!throttle){ pS[I].stat_counter_aux_us = host_us(); }
 	break;
       case 005: // LAM-FUNC-DEST-MID
 	// Macro Instruction Dispatch RAM
@@ -1900,6 +1902,8 @@ void handle_destination(int I){
 	}
 	break;
       case 042: // LAM-FUNC-DEST-RG-MODE
+	// Count host time up to now under the old aux counter mode
+	if(!throttle){ lambda_update_usec_clock(I); }
 	// THE WHOLE RG MODE REGISTER NOW LOOKS LIKE 12 READ/WRITE BITS, 8 READ-ONLY BITS, AND THEN 12 MORE READ/WRITE BITS
 	pS[I].RG_Mode.raw &= 0x000FF000;
 	pS[I].RG_Mode.raw |= (pS[I].Obus&0xFFF00FFF);
@@ -3624,6 +3628,19 @@ void sm_clock_pulse(int I,int clock,Processor_Mode_Reg *oldPMR){
 }
 
 // Normal Clock Pulse
+// Bring the aux stat counter up to date when the emulator is unthrottled.
+// In mode 6 the counter counts microseconds. A throttled emulator counts them
+// as bus cycles go by (see nubus_cycle); an unthrottled one runs faster than
+// a real Lambda, so the counter counts host time instead. It is brought up to
+// date whenever it is read, and before the mode register changes.
+void lambda_update_usec_clock(int I){
+  uint64_t now = host_us();
+  if(pS[I].stat_counter_aux_us != 0 && pS[I].RG_Mode.Aux_Stat_Count_Control == 6){
+    pS[I].stat_counter_aux += (uint32_t)(now - pS[I].stat_counter_aux_us);
+  }
+  pS[I].stat_counter_aux_us = now;
+}
+
 void lambda_clockpulse(int I){
   pS[I].cycle_count++;
   // Run one clock

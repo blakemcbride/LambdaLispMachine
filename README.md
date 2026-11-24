@@ -106,8 +106,9 @@ If LambdaDelta was built with libyaml it reads `lam.yml` instead of
       switch: 1
 
 A window opens showing the SDU monitor prompt (`>>`). Type `newboot` and
-press enter, and at the `Command:` prompt type `boot`. Lisp takes well under
-a minute to start. From there, continue at step 21 of
+press enter, and at the `Command:` prompt type `boot`. Lisp takes about 20
+seconds to start on a current PC (about a minute at the speed of a real
+Lambda; see [Using LambdaDelta](#using-lambdadelta)). From there, continue at step 21 of
 [Installing a New Machine](#installing-a-new-machine) to name the machine,
 create its file system and restore the system sources from
 `tapes/02_system.tap`.
@@ -215,7 +216,18 @@ of this document; See the "lam.yml" file in the examples directory.
 
 # Using LambdaDelta
 
+By default LambdaDelta runs as fast as the host allows, several times the
+speed of a real Lambda. The clocks Lisp reads (its microsecond clock and
+the 60 Hz vertical blank interrupt) follow the host's clock in this mode,
+so time in Lisp passes at the right rate. To run at the 5 MHz of a real
+Lambda instead, start the emulator with `-t`, or set `throttle on` in
+`ld.conf` (`throttle: on` in the `lam` section of `lam.yml`).
+
 While the program is running, the window title bar has the following form:
+
+    LambdaDelta: VC N | Tape: FNAME | STATUS | Speed S
+
+or, when throttled,
 
     LambdaDelta: VC N | Tape: FNAME | STATUS | DT X
 
@@ -234,7 +246,10 @@ associated with this console. The strings have the following meanings:
 | Running          | Lisp is running.                                                                                               |
 | Halted           | Lisp has stopped running. The processor has valid state. If you did not halt lisp, this is an error condition. |
            
-After the status string is the time offset. X is a number in deciseconds
+S is how many times faster than a real Lambda the emulator ran over the
+last second.
+
+When throttled, after the status string is the time offset. X is a number in deciseconds
 which indicates how far apart real time and the emulator's time are.
 The emulator will try to hold this number at 0, but if your computer is
 not fast enough to run the emulator in real time this number will become

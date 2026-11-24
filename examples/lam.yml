@@ -8,6 +8,9 @@
 lam:
   # Working Directory (where to chdir for to access disk/rom/tape images)
   wd: /usr/local/whatever/etc
+  # Run at the speed of a real Lambda (on) or as fast as the host allows (off).
+  # The default is off. The command-line option -t also turns it on.
+  throttle: off
   # File to use for physical keyboard IO
   kb_file: /dev/ttySX
   # Baud rate to use for physical keyboard IO

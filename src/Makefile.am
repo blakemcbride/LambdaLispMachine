@@ -1,5 +1,5 @@
 AM_CFLAGS = -std=gnu99 -Wall -Wextra -ggdb
-AM_LDFLAGS = -ggdb -Og
+AM_LDFLAGS = -ggdb
 
 bin_PROGRAMS = lam lpart
 

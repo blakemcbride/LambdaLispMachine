@@ -84,6 +84,14 @@
   Note that the video frame rate does not affect updation of the title bar,
   only the rate at which the SDL framebuffer is refreshed.
 
+  throttle STATE
+
+  With throttle on, the emulator runs at the 5 MHz of a real Lambda. With it
+  off, the default, it runs as fast as the host allows, and the clocks Lisp
+  reads follow the host's clock so that time in Lisp still passes at the
+  right rate. STATE is one of on,off,yes,no,true,or false. The command-line
+  option -t also turns throttling on.
+
   sdl_quit STATE
 
   Enables or disables handling of the platform-specific SDL_QUIT event.

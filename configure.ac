@@ -109,7 +109,6 @@ AC_TYPE_UINT8_T
 AC_TYPE_UID_T
 
 AX_CHECK_COMPILE_FLAG([-Wno-packed-bitfield-compat], [CFLAGS="$CFLAGS -Wno-packed-bitfield-compat"], [], [-Werror])
-AX_CHECK_COMPILE_FLAG([-Og], [CFLAGS="$CFLAGS -Og"], [], [-Werror])
 
 # Checks for library functions.
 AC_FUNC_MALLOC
