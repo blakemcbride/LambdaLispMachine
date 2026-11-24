@@ -320,6 +320,23 @@ saved to a file is lost. Save your editor buffers first.
 To stop Lisp without leaving the emulator, evaluate `(si:%halt)`, or
 press F11 to return to Newboot, where the `boot` command starts Lisp again.
 
+### Quitting from Lisp
+
+Lisp can shut the emulator down itself. NuBus slot `#xFE` is empty, and
+the emulator watches it: writing `#x51554954` to address 0 there ends the
+emulator the same way closing its window does, saving `CMOS.RAM` and
+`RTC.RAM`. Any other access to the slot times out as it would on an empty
+slot. Define a `quit` command for it in a Lisp Listener:
+
+    (defun quit ()
+      "Shut down the LambdaDelta emulator, as closing its window does."
+      (si:%nubus-write #xFE 0 #x51554954))
+
+Then `(quit)` closes the emulator. The definition lasts only until Lisp is
+booted again. To keep it, save the world to a spare band after defining it
+and make that band the one that boots, for example
+`(si:disk-save "LOD2")` and then `(si:set-current-band "LOD2")`.
+
 ## Preparing ROM Images
 
 The ROM images go in the "roms" subdirectory, and are already there in this

@@ -719,6 +719,24 @@ void sdl_system_shutdown_request(void){
   exit(0);
 }
 
+// Emulator control slot
+// No card is installed in NuBus slot 0xFE, so the emulator answers there to take
+// requests from Lisp. A word write of EMUCTL_QUIT to address 0 of the slot, which
+// (si:%nubus-write #xFE 0 #x51554954) does, shuts the emulator down the way closing
+// its window does. Anything else sent to the slot times out, as it would if the
+// slot were empty.
+#define EMUCTL_SLOT 0xFE
+#define EMUCTL_QUIT 0x51554954 // "QUIT"
+static int emuctl_quit_rq = 0;
+
+static void emuctl_clock_pulse(void){
+  if(NUbus_Busy == 2 && NUbus_acknowledge == 0 && NUbus_Address.Card == EMUCTL_SLOT &&
+     NUbus_Request == VM_WRITE && NUbus_Address.Addr == 0 && NUbus_Data.word == EMUCTL_QUIT){
+    NUbus_acknowledge = 1;
+    emuctl_quit_rq = 1;
+  }
+}
+
 static void sdl_process_key(SDL_KeyboardEvent *ev, int updown){
   kbd_handle_char(ev->scancode, updown);
 }
@@ -3725,6 +3743,7 @@ void nubus_cycle(int sdu){
 #ifdef CONFIG_2X2
   vcmem_clock_pulse(1);
 #endif
+  emuctl_clock_pulse();
   // Nubus signal maintenance goes last
   nubus_clock_pulse();
   bcount++; // Count bus cycles  
@@ -4004,6 +4023,11 @@ int main(int argc, char *argv[]){
     // Plumb SDU serial console (should probably happen in the input frame?)
     if(sdu_rotary_switch != 1){
       sdu_cons_clockpulse();
+    }
+    // Lisp asked the emulator to quit
+    if(emuctl_quit_rq != 0){
+      printf("Shutdown requested by Lisp\n");
+      sdl_system_shutdown_request();
     }
     // Update status line
     if(screenshot_request != 0){
