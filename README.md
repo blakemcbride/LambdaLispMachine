@@ -117,6 +117,49 @@ Ethernet needs a tuntap interface and the privilege to open it. Without
 that LambdaDelta prints `ether_init(): Operation not permitted` and runs
 without a network.
 
+## Bogodyne ZetaLisp
+
+The `zetalisp` directory holds Bogodyne ZetaLisp System 500.0 Release 1
+(microcode 1764), a 2020 release of the Lambda system software by Daniel
+Seagraves, LambdaDelta's author. It is unpacked from
+`ZetaLisp_R1.0_20200813.tgz`, from
+https://www.bogodyne.com/download/download-zetalisp/, and its license and
+release notes are in `zetalisp/README.ZetaLisp`. The directory is laid out
+as a LambdaDelta working directory with its own ROMs and tapes (its
+`SDU.ROM` is SDU Monitor 102, where the top-level one is version 8), so run
+the emulator from inside it. After building LambdaDelta:
+
+    cd zetalisp
+    mkdir -p disks
+    xz -dc installed/disk.img.xz > disks/disk.img
+    cp installed/CMOS.RAM installed/RTC.RAM .
+    cp ../examples/ld.conf ld.conf
+    ../src/lam
+
+Then type `newboot` and `boot` as above. `zetalisp/installed` was made by
+installing from the release's tapes through step 17 of
+[Installing a New Machine](#installing-a-new-machine), and the rest of that
+procedure applies from step 21, except that the backup tape to restore is
+`tapes/01-distribution.tap`. To install from scratch instead, follow the
+whole procedure in the `zetalisp` directory; there `install` loads
+everything from `tapes/00-install.tap` in one pass (SDU software,
+microcode into LMC1 and the band into LOD1), so `read-tape` is not needed.
+
+The default ZetaLisp site uses DHCP and tries for a while to get an
+address, reporting `DHCP: Failed to get an offer` when there is no
+network. This does no harm.
+
+The ZetaLisp site's time zone is US Central, while a new `RTC.RAM` starts
+out with Eastern. On the first boot after installing from scratch, Lisp
+warns that the time zone in the clock chip is wrong, and until the warning
+is seen the clock is not set: the message area shows `Process Initialize
+Timebase wants to type out` and the status line shows no time. Type
+Terminal 0 S (F4, then 0, then S) to see it; Lisp then sets the clock and
+stores Central in the clock chip, so later boots are quiet. The time it
+sets was read before the warning, so it is behind by however long the
+warning waited; boot again to get the right time.
+`zetalisp/installed/RTC.RAM` already holds Central.
+
 # What Is In This Repository
 
 | Path        | Contents |
@@ -130,6 +173,7 @@ without a network.
 | `software`  | Archives of Lambda file systems (`dj_full.tgz`, `jb_full.tgz`) and the K-Machine software (`k_machine.tgz`). These hold the Lisp system sources as ordinary files. |
 | `doc`       | `KEYCODES` and `OLDCONF.md` for the emulator, and in `doc/lmi` the LMI manuals (Lisp, editors, hardware, Unix, release notes), the field service manual, SDU description, K-Machine material and board photographs. `doc/lmi/tapes.txt` describes the two main tapes. |
 | `examples`  | Sample configuration files. |
+| `zetalisp`  | Bogodyne ZetaLisp System 500.0 Release 1, with an installed disk image; see [Bogodyne ZetaLisp](#bogodyne-zetalisp). |
 
 The ROM, tape, software and documentation files came from Bitsavers
 (http://www.bitsavers.org/), directories `pdf/lmi` and `bits/LMI`.
@@ -152,7 +196,8 @@ an installed disk image is in `installed`, and the installation tape
 (`00_install.tap`) and system source tape (`02_system.tap`) are in the
 `tapes` directory. The LMI manuals are in `doc/lmi`.
 
-Bogodyne ZetaLisp System 500.0 Release 1 can be found at https://www.bogodyne.com/download/download-zetalisp/
+Bogodyne ZetaLisp System 500.0 Release 1 is included too, in `zetalisp`;
+see [Bogodyne ZetaLisp](#bogodyne-zetalisp).
 
 ## Building LambdaDelta
 
