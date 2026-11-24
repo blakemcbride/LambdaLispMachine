@@ -46,6 +46,7 @@
 
 /* Motorola MC146818 RTC */
 uint32_t rtc_cycle_count;
+uint64_t rtc_next_tick_us;	// Host time of the next RTC tick (throttle off)
 uint32_t rtc_addr; // Address Register
 struct timeval rtc_last;	// last time RTC updated from localtime
 #define RTC_UPDATE_DELTA 10	// min seconds between using localtime
@@ -1900,10 +1901,22 @@ void sdu_clock_pulse(){
   // RTC updation
   if(RTC_REGB.Set == 0){
     // We are enabled
+    int rtc_tick;
     rtc_cycle_count++;
-    // Lambda has a 5MHz clock.
+    if(throttle){
+      // Lambda has a 5MHz clock.
+      rtc_tick = (rtc_cycle_count >= 5000000);
+    }else{
+      // Unthrottled, tick once per second of host time
+      if(rtc_next_tick_us == 0){ rtc_next_tick_us = host_now_us + 1000000; }
+      rtc_tick = (host_now_us >= rtc_next_tick_us);
+      if(rtc_tick){
+	rtc_next_tick_us += 1000000;
+	if(rtc_next_tick_us <= host_now_us){ rtc_next_tick_us = host_now_us + 1000000; }
+      }
+    }
     // At 32 KHz, it takes 1984 microseconds to update the clock.
-    if(rtc_cycle_count >= 5000000){
+    if(rtc_tick){
       rtc_cycle_count = 0;
       RTC_REGA.Update_In_Progress = 1;      
       RTC_Counter[RTC_SECONDS]++;

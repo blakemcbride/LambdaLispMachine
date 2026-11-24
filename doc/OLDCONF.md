@@ -88,7 +88,8 @@
 
   With throttle on, the emulator runs at the 5 MHz of a real Lambda. With it
   off, the default, it runs as fast as the host allows, and the clocks Lisp
-  reads follow the host's clock so that time in Lisp still passes at the
+  reads (microsecond counter, vertical blank, SDU real-time clock) follow
+  the host's clock so that time in Lisp still passes at the
   right rate. STATE is one of on,off,yes,no,true,or false. The command-line
   option -t also turns throttling on.
 

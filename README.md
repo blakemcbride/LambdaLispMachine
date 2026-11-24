@@ -217,8 +217,9 @@ of this document; See the "lam.yml" file in the examples directory.
 # Using LambdaDelta
 
 By default LambdaDelta runs as fast as the host allows, several times the
-speed of a real Lambda. The clocks Lisp reads (its microsecond clock and
-the 60 Hz vertical blank interrupt) follow the host's clock in this mode,
+speed of a real Lambda. The clocks Lisp reads (its microsecond clock, the
+60 Hz vertical blank interrupt and the SDU's real-time clock) follow the
+host's clock in this mode,
 so time in Lisp passes at the right rate. To run at the 5 MHz of a real
 Lambda instead, start the emulator with `-t`, or set `throttle on` in
 `ld.conf` (`throttle: on` in the `lam` section of `lam.yml`).

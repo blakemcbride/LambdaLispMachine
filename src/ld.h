@@ -29,8 +29,9 @@ void debug_clockpulse();
 #endif 
 void nubus_cycle(int sdu);
 // Speed control. With throttle off the emulator runs as fast as the host
-// allows, and the clocks Lisp reads (the microsecond counter and the 60 Hz
-// vertical blank interrupt) follow host time instead of counting bus cycles.
+// allows, and the clocks Lisp reads (the microsecond counter, the 60 Hz
+// vertical blank interrupt and the SDU's real-time clock) follow host time
+// instead of counting bus cycles.
 // With throttle on it runs at the 5 MHz of a real Lambda and the clocks count
 // bus cycles, as the hardware's did.
 extern int throttle;
